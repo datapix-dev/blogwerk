@@ -83,9 +83,14 @@ export async function generateArticle(
   try {
     parsed = JSON.parse(fixUnescapedControlChars(cleaned))
   } catch (parseErr) {
-    console.error(`[claude] JSON parse failed. stop_reason=${message.stop_reason} length=${cleaned.length}`)
-    console.error(`[claude] First 300: ${cleaned.slice(0, 300)}`)
-    console.error(`[claude] Last 300: ${cleaned.slice(-300)}`)
+    const errMsg = parseErr instanceof Error ? parseErr.message : String(parseErr)
+    const posMatch = errMsg.match(/position (\d+)/)
+    const pos = posMatch ? parseInt(posMatch[1]) : -1
+    console.error(`[claude] JSON parse error: ${errMsg}`)
+    if (pos >= 0) {
+      const fixed = fixUnescapedControlChars(cleaned)
+      console.error(`[claude] Context at pos ${pos}: ...${JSON.stringify(fixed.slice(Math.max(0, pos - 50), pos + 50))}...`)
+    }
     throw new Error(`Failed to parse Claude response as JSON: ${cleaned.slice(0, 200)}`)
   }
 
