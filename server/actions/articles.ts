@@ -152,19 +152,42 @@ export async function generateArticleAction(
 
   try {
     const { article, job } = await db.$transaction(async (tx) => {
-      const article = await tx.article.create({
-        data: {
-          projectId: keyword.projectId,
-          keywordId: keyword.id,
-          authorId: session.user.id,
-          status: "DRAFT",
-        },
-        select: { id: true },
+      // Reuse existing article if it failed or is still a blank draft
+      const existing = await tx.article.findUnique({
+        where: { keywordId: keyword.id },
+        select: { id: true, status: true },
       })
+
+      let articleId: string
+      if (existing) {
+        if (!["FAILED", "DRAFT"].includes(existing.status)) {
+          throw new Error(`ALREADY_EXISTS:${existing.id}`)
+        }
+        await tx.article.update({
+          where: { id: existing.id },
+          data: { status: "DRAFT", title: null, slug: null, contentHtml: null, contentMarkdown: null },
+        })
+        await tx.generationJob.updateMany({
+          where: { articleId: existing.id, status: { in: ["PENDING", "PROCESSING"] } },
+          data: { status: "FAILED" },
+        })
+        articleId = existing.id
+      } else {
+        const created = await tx.article.create({
+          data: {
+            projectId: keyword.projectId,
+            keywordId: keyword.id,
+            authorId: session.user.id,
+            status: "DRAFT",
+          },
+          select: { id: true },
+        })
+        articleId = created.id
+      }
 
       const job = await tx.generationJob.create({
         data: {
-          articleId: article.id,
+          articleId,
           type: "ARTICLE_GENERATION",
           status: "PENDING",
           payload: { keywordId, projectId: keyword.projectId },
@@ -172,7 +195,7 @@ export async function generateArticleAction(
         select: { id: true },
       })
 
-      return { article, job }
+      return { article: { id: articleId }, job }
     })
 
     await articleGenerationQueue.add(
@@ -184,6 +207,11 @@ export async function generateArticleAction(
     revalidatePath("/articles")
     return { success: true, articleId: article.id }
   } catch (err) {
+    const msg = err instanceof Error ? err.message : ""
+    if (msg.startsWith("ALREADY_EXISTS:")) {
+      const existingId = msg.split(":")[1]
+      return { success: true, articleId: existingId }
+    }
     console.error("[generateArticleAction]", err)
     return { success: false, error: "Failed to start article generation." }
   }
