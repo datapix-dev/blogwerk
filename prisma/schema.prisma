@@ -183,6 +183,7 @@ model Article {
 enum ArticleStatus {
   DRAFT
   AI_GENERATED
+  ADAPTED
   NEEDS_REVIEW
   APPROVED
   SCHEDULED
@@ -248,6 +249,7 @@ model GenerationJob {
 enum JobType {
   ARTICLE_GENERATION
   IMAGE_GENERATION
+  ADAPTATION
   PUBLISH
 }
 

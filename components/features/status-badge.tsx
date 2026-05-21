@@ -19,6 +19,7 @@ const statusMap: Record<string, StatusConfig> = {
   PUBLISHED: { label: "Published", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   DRAFT: { label: "Draft", className: "bg-zinc-100 text-zinc-500 border-zinc-200" },
   AI_GENERATED: { label: "AI Generated", className: "bg-violet-50 text-violet-700 border-violet-200" },
+  ADAPTED: { label: "Adapted", className: "bg-indigo-50 text-indigo-700 border-indigo-200" },
   NEEDS_REVIEW: { label: "Needs Review", className: "bg-amber-50 text-amber-700 border-amber-200" },
   APPROVED: { label: "Approved", className: "bg-teal-50 text-teal-700 border-teal-200" },
   SCHEDULED: { label: "Scheduled", className: "bg-blue-50 text-blue-700 border-blue-200" },

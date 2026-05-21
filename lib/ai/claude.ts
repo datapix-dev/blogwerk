@@ -1,6 +1,19 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { jsonrepair } from "jsonrepair"
-import { buildSystemPrompt, buildUserPrompt } from "./prompts"
+import { buildSystemPrompt, buildUserPrompt, buildAdaptationSystemPrompt, buildAdaptationUserPrompt } from "./prompts"
+
+export interface AdaptArticleParams {
+  contentHtml: string
+  adaptationTemplate: string
+  keyword: string
+  language: string
+  apiKey?: string
+}
+
+export interface AdaptedArticle {
+  contentHtml: string
+  contentMarkdown: string
+}
 
 export interface GenerateArticleParams {
   keyword: string
@@ -88,5 +101,39 @@ export async function generateArticle(
     tags: Array.isArray(parsed.tags)
       ? (parsed.tags as string[]).filter((t) => typeof t === "string")
       : [],
+  }
+}
+
+export async function adaptArticle(params: AdaptArticleParams): Promise<AdaptedArticle> {
+  const client = new Anthropic({ apiKey: params.apiKey ?? process.env.ANTHROPIC_API_KEY })
+
+  const message = await client.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 8192,
+    system: buildAdaptationSystemPrompt(),
+    messages: [{ role: "user", content: buildAdaptationUserPrompt(params) }],
+  })
+
+  const rawContent = message.content[0]
+  if (rawContent.type !== "text") throw new Error("Unexpected response type from Claude API")
+
+  const cleaned = stripJsonFences(rawContent.text)
+  let parsed: Record<string, unknown>
+  try {
+    parsed = JSON.parse(jsonrepair(cleaned))
+  } catch {
+    throw new Error(`Failed to parse Claude adaptation response: ${cleaned.slice(0, 200)}`)
+  }
+
+  if (!parsed.contentHtml || typeof parsed.contentHtml !== "string") {
+    throw new Error("Missing contentHtml in Claude adaptation response")
+  }
+  if (!parsed.contentMarkdown || typeof parsed.contentMarkdown !== "string") {
+    throw new Error("Missing contentMarkdown in Claude adaptation response")
+  }
+
+  return {
+    contentHtml: parsed.contentHtml as string,
+    contentMarkdown: parsed.contentMarkdown as string,
   }
 }

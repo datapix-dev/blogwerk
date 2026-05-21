@@ -1,4 +1,4 @@
-import type { GenerateArticleParams } from "./claude"
+import type { GenerateArticleParams, AdaptArticleParams } from "./claude"
 
 export function buildSystemPrompt(): string {
   return `You are an expert SEO content writer who produces high-quality, engaging articles.
@@ -68,4 +68,43 @@ export function buildUserPrompt(params: GenerateArticleParams): string {
   )
 
   return lines.join("\n")
+}
+
+export function buildAdaptationSystemPrompt(): string {
+  return `You are an expert content editor and web developer specializing in blog publishing.
+
+Your task: adapt a raw SEO article to match a Blog Adaptation Guide exactly.
+
+RULES:
+1. Preserve ALL factual information and key points from the original
+2. Add required structural elements (FAQ, CTAs, intro boxes, key takeaways, etc.) using content derived from the article — do NOT invent new facts
+3. Apply the exact HTML structure, CSS classes, and WordPress blocks from the guide
+4. Match the tone, voice, and style requirements from the guide
+5. Derive FAQ questions and answers directly from the article content
+6. Place CTAs and special elements exactly where the guide specifies
+
+CRITICAL: Respond ONLY with a valid JSON object — no markdown fences, no prose:
+{
+  "contentHtml": "string — fully adapted HTML matching the guide's structure",
+  "contentMarkdown": "string — the same content in clean Markdown"
+}`
+}
+
+export function buildAdaptationUserPrompt(params: AdaptArticleParams): string {
+  return [
+    `BLOG ADAPTATION GUIDE:`,
+    `---`,
+    params.adaptationTemplate,
+    `---`,
+    ``,
+    `RAW ARTICLE (HTML):`,
+    `---`,
+    params.contentHtml,
+    `---`,
+    ``,
+    `Keyword: ${params.keyword}`,
+    `Language: ${params.language}`,
+    ``,
+    `Adapt this article according to the guide. Return only the JSON object.`,
+  ].join("\n")
 }

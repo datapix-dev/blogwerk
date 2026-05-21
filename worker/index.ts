@@ -2,6 +2,7 @@ import { Worker } from "bullmq"
 import { redis } from "../lib/redis"
 import { processArticleJob } from "./processors/article"
 import { processImageJob } from "./processors/image"
+import { processAdaptationJob } from "./processors/adaptation"
 import { processPublishJob } from "./processors/publish"
 
 console.log("BlogPlanner Worker starting...")
@@ -34,6 +35,16 @@ const imageWorker = new Worker(
   }
 )
 
+const adaptationWorker = new Worker(
+  "article-adaptation",
+  async (job) => { await processAdaptationJob(job) },
+  {
+    connection: redis,
+    concurrency: 2,
+    settings: { backoffStrategy: (n: number) => Math.pow(2, n) * 5000 },
+  }
+)
+
 const publishWorker = new Worker(
   "publish",
   async (job) => {
@@ -53,6 +64,12 @@ imageWorker.on("completed", (job) =>
 )
 imageWorker.on("failed", (job, err) =>
   console.error(`[image-generation] Job ${job?.id} failed:`, err.message)
+)
+adaptationWorker.on("completed", (job) =>
+  console.log(`[article-adaptation] Job ${job.id} completed`)
+)
+adaptationWorker.on("failed", (job, err) =>
+  console.error(`[article-adaptation] Job ${job?.id} failed:`, err.message)
 )
 publishWorker.on("completed", (job) =>
   console.log(`[publish] Job ${job.id} completed`)

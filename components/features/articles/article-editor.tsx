@@ -22,6 +22,7 @@ import {
   updateArticleStatus,
   generateArticleAction,
 } from "@/server/actions/articles"
+import { adaptArticleAction } from "@/server/actions/adaptation"
 import { publishArticleAction } from "@/server/actions/publish"
 import { getConnectionByProject } from "@/server/actions/connections"
 import type { ConnectionWithProject } from "@/server/actions/connections"
@@ -42,10 +43,12 @@ import {
   AlertCircle,
   Send,
   ImageIcon,
+  Wand2,
 } from "lucide-react"
 
 interface ArticleEditorProps {
   article: ArticleWithRelations
+  hasAdaptationTemplate?: boolean
 }
 
 type ContentView = "preview" | "html" | "markdown"
@@ -60,7 +63,7 @@ const ERROR_TYPE_MESSAGES: Record<string, string> = {
   UNKNOWN: "Unknown error",
 }
 
-export function ArticleEditor({ article: initialArticle }: ArticleEditorProps) {
+export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate = false }: ArticleEditorProps) {
   const router = useRouter()
 
   const [title, setTitle] = React.useState(initialArticle.title ?? "")
@@ -87,6 +90,38 @@ export function ArticleEditor({ article: initialArticle }: ArticleEditorProps) {
   const [generatingImage, setGeneratingImage] = React.useState(false)
   const [imageJobPending, setImageJobPending] = React.useState(false)
   const [imageCacheBust, setImageCacheBust] = React.useState(Date.now())
+  const [adapting, setAdapting] = React.useState(false)
+  const [adaptationPending, setAdaptationPending] = React.useState(false)
+
+  const { data: adaptationStatus } = useSWR(
+    adaptationPending ? `/api/articles/${initialArticle.id}/adaptation-status` : null,
+    (url: string) => fetch(url).then((r) => r.json()) as Promise<{
+      articleStatus: string
+      contentHtml: string | null
+      contentMarkdown: string | null
+      jobStatus: string | null
+      errorType: string | null
+      errorMsg: string | null
+    }>,
+    {
+      refreshInterval: (data) =>
+        data?.jobStatus === "COMPLETED" || data?.jobStatus === "FAILED" ? 0 : 3000,
+    }
+  )
+
+  React.useEffect(() => {
+    if (adaptationStatus?.jobStatus === "COMPLETED") {
+      setAdaptationPending(false)
+      if (adaptationStatus.contentHtml) setContentHtml(adaptationStatus.contentHtml)
+      if (adaptationStatus.contentMarkdown) setContentMarkdown(adaptationStatus.contentMarkdown)
+      setStatus("ADAPTED")
+      toast.success("Article adapted for blog.")
+      router.refresh()
+    } else if (adaptationStatus?.jobStatus === "FAILED") {
+      setAdaptationPending(false)
+      toast.error("Blog adaptation failed. Please try again.")
+    }
+  }, [adaptationStatus?.jobStatus, adaptationStatus?.contentHtml, adaptationStatus?.contentMarkdown, router])
 
   const { data: imageStatus } = useSWR(
     imageJobPending ? `/api/articles/${initialArticle.id}/image-status` : null,
@@ -234,6 +269,23 @@ export function ArticleEditor({ article: initialArticle }: ArticleEditorProps) {
     }
   }
 
+  async function handleAdapt() {
+    setAdapting(true)
+    try {
+      const result = await adaptArticleAction(initialArticle.id)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      setAdaptationPending(true)
+      toast.success("Blog adaptation started…")
+    } catch {
+      toast.error("Failed to start adaptation.")
+    } finally {
+      setAdapting(false)
+    }
+  }
+
   async function handlePublish() {
     if (!connection?.id) return
     setPublishing(true)
@@ -269,8 +321,8 @@ export function ArticleEditor({ article: initialArticle }: ArticleEditorProps) {
     }
   }
 
-  const canApprove = status === "AI_GENERATED" || status === "NEEDS_REVIEW"
-  const canRequestReview = status === "AI_GENERATED" || status === "APPROVED"
+  const canApprove = status === "AI_GENERATED" || status === "ADAPTED" || status === "NEEDS_REVIEW"
+  const canRequestReview = status === "AI_GENERATED" || status === "ADAPTED" || status === "APPROVED"
 
   return (
     <TooltipProvider>
@@ -369,6 +421,30 @@ export function ArticleEditor({ article: initialArticle }: ArticleEditorProps) {
                   : "No keyword linked — cannot regenerate"}
               </TooltipContent>
             </Tooltip>
+
+            {hasAdaptationTemplate && contentHtml && (
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 border-violet-200 text-violet-700 hover:bg-violet-50"
+                    disabled={adapting || adaptationPending}
+                    onClick={handleAdapt}
+                  >
+                    {adapting || adaptationPending ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Wand2 className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    {adaptationPending ? "Adapting…" : "Adapt for Blog"}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Restructure and format using the Blog Adaptation template
+                </TooltipContent>
+              </Tooltip>
+            )}
 
             <Button
               size="sm"
