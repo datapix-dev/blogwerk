@@ -89,13 +89,13 @@ export function TemplateDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Template" : "New Template"}</DialogTitle>
           <p className="text-xs text-zinc-500">Project: {projectName}</p>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-4 py-2 overflow-y-auto flex-1">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>Template Name</Label>
@@ -131,8 +131,7 @@ export function TemplateDialog({
             <Textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              rows={12}
-              className="font-mono text-xs resize-none"
+              className="font-mono text-xs resize-y min-h-[300px]"
               placeholder="Enter the prompt template content..."
             />
           </div>
