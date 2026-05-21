@@ -1,0 +1,300 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Workspace {
+  id               String    @id @default(cuid())
+  name             String
+  slug             String    @unique
+  monthlyGenLimit  Int       @default(100)
+  createdAt        DateTime  @default(now())
+
+  users            User[]
+  projects         Project[]
+  apiConnections   ApiConnection[]
+  usage            WorkspaceUsage[]
+  searchConsole    SearchConsoleConnection?
+}
+
+model WorkspaceUsage {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  month          String
+  articleCount   Int       @default(0)
+  imageCount     Int       @default(0)
+  estimatedCost  Float     @default(0)
+
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, month])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  email        String   @unique
+  name         String?
+  password     String?
+  role         Role     @default(EDITOR)
+  createdAt    DateTime @default(now())
+
+  workspace    Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projects     ProjectAssignment[]
+  articles     Article[]
+  activityLogs ActivityLog[]
+}
+
+enum Role {
+  ADMIN
+  PROJECT_MANAGER
+  EDITOR
+  CUSTOMER
+}
+
+model Project {
+  id                 String        @id @default(cuid())
+  workspaceId        String
+  name               String
+  clientName         String?
+  blogUrl            String?
+  language           String        @default("de")
+  targetAudience     String?
+  toneOfVoice        String?
+  defaultPublishMode PublishMode   @default(DRAFT)
+  status             ProjectStatus @default(ACTIVE)
+  createdAt          DateTime      @default(now())
+
+  workspace          Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assignments        ProjectAssignment[]
+  keywords           Keyword[]
+  articles           Article[]
+  promptTemplates    PromptTemplate[]
+  apiConnection      ApiConnection?
+}
+
+enum ProjectStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum PublishMode {
+  DRAFT
+  SCHEDULED
+  PUBLISH
+}
+
+model ProjectAssignment {
+  userId    String
+  projectId String
+
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([userId, projectId])
+}
+
+model Keyword {
+  id           String        @id @default(cuid())
+  projectId    String
+  keyword      String
+  searchVolume Int?
+  difficulty   Int?
+  intent       SearchIntent?
+  priority     Priority      @default(MEDIUM)
+  cluster      String?
+  targetUrl    String?
+  status       KeywordStatus @default(OPEN)
+  createdAt    DateTime      @default(now())
+
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  article      Article?
+}
+
+enum KeywordStatus {
+  OPEN
+  PLANNED
+  IN_PROGRESS
+  GENERATED
+  PUBLISHED
+}
+
+enum SearchIntent {
+  INFORMATIONAL
+  NAVIGATIONAL
+  COMMERCIAL
+  TRANSACTIONAL
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Article {
+  id              String        @id @default(cuid())
+  projectId       String
+  keywordId       String?       @unique
+  authorId        String?
+  title           String?
+  slug            String?
+  contentHtml     String?       @db.Text
+  contentMarkdown String?       @db.Text
+  metaTitle       String?
+  metaDescription String?
+  excerpt         String?
+  category        String?
+  tags            String[]
+  featuredImage   String?
+  status          ArticleStatus @default(DRAFT)
+  publishMode     PublishMode   @default(DRAFT)
+  publishAt       DateTime?
+  url             String?
+  targetKeywords  String[]
+  externalId      String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  keyword         Keyword?        @relation(fields: [keywordId], references: [id])
+  author          User?           @relation(fields: [authorId], references: [id])
+  generationJobs  GenerationJob[]
+  analytics       ArticleAnalytics?
+}
+
+enum ArticleStatus {
+  DRAFT
+  AI_GENERATED
+  NEEDS_REVIEW
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  FAILED
+}
+
+model PromptTemplate {
+  id        String       @id @default(cuid())
+  projectId String
+  type      TemplateType
+  name      String
+  content   String       @db.Text
+  version   Int          @default(1)
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+enum TemplateType {
+  ARTICLE
+  FORMATTING
+  IMAGE
+}
+
+model ApiConnection {
+  id           String         @id @default(cuid())
+  workspaceId  String
+  projectId    String         @unique
+  type         ConnectionType
+  config       Json
+  isVerified   Boolean        @default(false)
+  lastTestedAt DateTime?
+  lastSyncAt   DateTime?
+  createdAt    DateTime       @default(now())
+
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+enum ConnectionType {
+  WORDPRESS
+  CUSTOM_API
+}
+
+model GenerationJob {
+  id        String        @id @default(cuid())
+  articleId String
+  type      JobType
+  status    JobStatus     @default(PENDING)
+  errorType JobErrorType?
+  errorMsg  String?
+  payload   Json?
+  result    Json?
+  attempts  Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+}
+
+enum JobType {
+  ARTICLE_GENERATION
+  IMAGE_GENERATION
+  PUBLISH
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum JobErrorType {
+  CLAUDE_TIMEOUT
+  CLAUDE_RATE_LIMIT
+  INVALID_WP_CREDENTIALS
+  IMAGE_GENERATION_FAILED
+  RATE_LIMIT_REACHED
+  NETWORK_ERROR
+  UNKNOWN
+}
+
+model SearchConsoleConnection {
+  id           String   @id @default(cuid())
+  workspaceId  String   @unique
+  siteUrl      String?
+  accessToken  String?
+  refreshToken String?
+  isConnected  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model ArticleAnalytics {
+  id          String   @id @default(cuid())
+  articleId   String   @unique
+  clicks      Int      @default(0)
+  impressions Int      @default(0)
+  position    Float?
+  ctr         Float?
+  updatedAt   DateTime @updatedAt
+
+  article     Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+}
+
+model KeywordRanking {
+  id         String   @id @default(cuid())
+  keywordId  String
+  position   Float?
+  url        String?
+  recordedAt DateTime @default(now())
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String?
+  entityId  String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  user      User? @relation(fields: [userId], references: [id])
+}
