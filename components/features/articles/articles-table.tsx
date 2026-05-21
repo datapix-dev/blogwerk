@@ -2,9 +2,10 @@
 
 import * as React from "react"
 import { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, MoreHorizontal, Trash2, Eye, Sparkles, X } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal, Trash2, Eye, Sparkles, X, CalendarDays } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -25,6 +26,7 @@ import { DataTable } from "../data-table"
 import { StatusBadge } from "../status-badge"
 import { GenerateArticleDialog } from "./generate-article-dialog"
 import { deleteArticles } from "@/server/actions/articles"
+import { scheduleArticle } from "@/server/actions/calendar"
 import type { ArticleWithRelations } from "@/server/actions/articles"
 import type { ArticleStatus } from "@prisma/client"
 
@@ -184,10 +186,28 @@ export function ArticlesTable({ initialData, projects, keywords }: ArticlesTable
           <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-lg w-7 h-7 hover:bg-muted transition-colors">
             <MoreHorizontal className="w-4 h-4" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-36">
+          <DropdownMenuContent align="end" className="w-40">
             <DropdownMenuItem onClick={() => router.push(`/articles/${row.original.id}`)}>
               <Eye className="w-3.5 h-3.5 mr-2" />View
             </DropdownMenuItem>
+            {["AI_GENERATED", "NEEDS_REVIEW", "APPROVED"].includes(row.original.status) && (
+              <DropdownMenuItem
+                onClick={async () => {
+                  const d = new Date()
+                  d.setDate(d.getDate() + 1)
+                  d.setHours(9, 0, 0, 0)
+                  const res = await scheduleArticle(row.original.id, d)
+                  if (res.success) {
+                    toast.success("Scheduled for tomorrow 9am.")
+                    router.refresh()
+                  } else {
+                    toast.error(res.error)
+                  }
+                }}
+              >
+                <CalendarDays className="w-3.5 h-3.5 mr-2" />Schedule
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-red-600 focus:text-red-600"
