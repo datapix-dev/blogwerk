@@ -1,15 +1,21 @@
 import { Worker } from "bullmq"
 import { redis } from "../lib/redis"
+import { processArticleJob } from "./processors/article"
 
 console.log("BlogPlanner Worker starting...")
 
 const articleWorker = new Worker(
   "article-generation",
   async (job) => {
-    console.log(`[article-generation] Processing job ${job.id}`)
-    return { status: "stub" }
+    await processArticleJob(job)
   },
-  { connection: redis, concurrency: 2 }
+  {
+    connection: redis,
+    concurrency: 2,
+    settings: {
+      backoffStrategy: (attemptsMade: number) => Math.pow(2, attemptsMade) * 5000,
+    },
+  }
 )
 
 const imageWorker = new Worker(
@@ -30,11 +36,23 @@ const publishWorker = new Worker(
   { connection: redis, concurrency: 2 }
 )
 
-articleWorker.on("completed", (job) => console.log(`[article-generation] Job ${job.id} completed`))
-articleWorker.on("failed", (job, err) => console.error(`[article-generation] Job ${job?.id} failed:`, err.message))
-imageWorker.on("completed", (job) => console.log(`[image-generation] Job ${job.id} completed`))
-imageWorker.on("failed", (job, err) => console.error(`[image-generation] Job ${job?.id} failed:`, err.message))
-publishWorker.on("completed", (job) => console.log(`[publish] Job ${job.id} completed`))
-publishWorker.on("failed", (job, err) => console.error(`[publish] Job ${job?.id} failed:`, err.message))
+articleWorker.on("completed", (job) =>
+  console.log(`[article-generation] Job ${job.id} completed`)
+)
+articleWorker.on("failed", (job, err) =>
+  console.error(`[article-generation] Job ${job?.id} failed:`, err.message)
+)
+imageWorker.on("completed", (job) =>
+  console.log(`[image-generation] Job ${job.id} completed`)
+)
+imageWorker.on("failed", (job, err) =>
+  console.error(`[image-generation] Job ${job?.id} failed:`, err.message)
+)
+publishWorker.on("completed", (job) =>
+  console.log(`[publish] Job ${job.id} completed`)
+)
+publishWorker.on("failed", (job, err) =>
+  console.error(`[publish] Job ${job?.id} failed:`, err.message)
+)
 
 console.log("Worker ready. Listening for jobs...")
