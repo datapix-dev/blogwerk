@@ -1,5 +1,5 @@
 import { Worker } from "bullmq"
-import { redis } from "@/lib/redis"
+import { redis } from "../lib/redis"
 
 console.log("BlogPlanner Worker starting...")
 

@@ -11,5 +11,5 @@ ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
-RUN npx tsc --project tsconfig.worker.json 2>/dev/null || true
+RUN npx tsc --project tsconfig.worker.json
 CMD ["node", "dist/worker/index.js"]

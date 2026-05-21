@@ -1,5 +1,5 @@
 import { Queue } from "bullmq"
-import { redis } from "@/lib/redis"
+import { redis } from "../../lib/redis"
 
 export const articleGenerationQueue = new Queue("article-generation", {
   connection: redis,
