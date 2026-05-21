@@ -170,6 +170,7 @@ model Article {
   url             String?
   targetKeywords          String[]
   externalId              String?
+  blocks                  Json?
   faqSuggestions          Json?
   internalLinkSuggestions Json?
   ctaSuggestions          Json?

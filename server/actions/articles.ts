@@ -31,6 +31,7 @@ export type ArticleWithRelations = {
   publishMode: string
   publishAt: Date | null
   url: string | null
+  blocks: unknown
   faqSuggestions: unknown
   internalLinkSuggestions: unknown
   ctaSuggestions: unknown
@@ -70,6 +71,7 @@ const articleSelect = {
   publishMode: true,
   publishAt: true,
   url: true,
+  blocks: true,
   faqSuggestions: true,
   internalLinkSuggestions: true,
   ctaSuggestions: true,
