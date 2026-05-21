@@ -11,6 +11,6 @@ ssh $SERVER "
   git pull origin main
   docker compose -f docker-compose.prod.yml build --no-cache
   docker compose -f docker-compose.prod.yml up -d
-  docker compose -f docker-compose.prod.yml exec web npx prisma migrate deploy
+  docker compose -f docker-compose.prod.yml exec web npx prisma db push --accept-data-loss
   echo 'Deploy complete'
 "

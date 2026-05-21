@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { useState } from "react"
 import {
   LayoutDashboard, FolderKanban, Tags, FileText,
-  Sparkles, Plug, BarChart3, Users, Settings, ChevronLeft,
+  Sparkles, Plug, BarChart3, Users, Settings, ChevronLeft, KeyRound,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,7 @@ const ALL_NAV = [
   { href: "/connections",  label: "Connections",  icon: Plug,            roles: ["ADMIN","PROJECT_MANAGER"] },
   { href: "/reports",      label: "Reports",      icon: BarChart3,       roles: ["ADMIN","PROJECT_MANAGER","EDITOR","CUSTOMER"] },
   { href: "/users",        label: "Users",        icon: Users,           roles: ["ADMIN"] },
+  { href: "/api-keys",     label: "AI API Keys",  icon: KeyRound,        roles: ["ADMIN"] },
   { href: "/settings",     label: "Settings",     icon: Settings,        roles: ["ADMIN","PROJECT_MANAGER","EDITOR","CUSTOMER"] },
 ]
 

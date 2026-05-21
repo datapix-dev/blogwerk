@@ -31,13 +31,13 @@ async function optimizeAndSave(buffer: Buffer, articleId: string): Promise<strin
   return outPath
 }
 
-async function generateWithOpenAI(prompt: string): Promise<Buffer> {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error("OPENAI_API_KEY not configured")
+async function generateWithOpenAI(prompt: string, apiKey?: string): Promise<Buffer> {
+  const key = apiKey ?? process.env.OPENAI_API_KEY
+  if (!key) throw new Error("OPENAI_API_KEY not configured")
 
   const res = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "dall-e-3",
       prompt,
@@ -57,12 +57,12 @@ async function generateWithOpenAI(prompt: string): Promise<Buffer> {
   return Buffer.from(data.data[0].b64_json, "base64")
 }
 
-async function generateWithGoogleAI(prompt: string): Promise<Buffer> {
-  const apiKey = process.env.GOOGLE_AI_API_KEY
-  if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured")
+async function generateWithGoogleAI(prompt: string, apiKey?: string): Promise<Buffer> {
+  const key = apiKey ?? process.env.GOOGLE_AI_API_KEY
+  if (!key) throw new Error("GOOGLE_AI_API_KEY not configured")
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${key}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -96,18 +96,26 @@ function generatePlaceholderSvg(prompt: string): Buffer {
   return Buffer.from(svg)
 }
 
+export interface ImageApiKeys {
+  openaiKey?: string
+  googleAiKey?: string
+}
+
 export async function generateAndSaveImage(
   prompt: string,
-  articleId: string
+  articleId: string,
+  keys?: ImageApiKeys
 ): Promise<string> {
   let buffer: Buffer
 
-  if (process.env.OPENAI_API_KEY) {
-    buffer = await generateWithOpenAI(prompt)
-  } else if (process.env.GOOGLE_AI_API_KEY) {
-    buffer = await generateWithGoogleAI(prompt)
+  const openaiKey = keys?.openaiKey ?? process.env.OPENAI_API_KEY
+  const googleKey = keys?.googleAiKey ?? process.env.GOOGLE_AI_API_KEY
+
+  if (openaiKey) {
+    buffer = await generateWithOpenAI(prompt, openaiKey)
+  } else if (googleKey) {
+    buffer = await generateWithGoogleAI(prompt, googleKey)
   } else {
-    // No image API key — generate SVG placeholder
     buffer = generatePlaceholderSvg(prompt)
   }
 

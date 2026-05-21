@@ -1,6 +1,7 @@
 import type { Job } from "bullmq"
 import { db } from "../../lib/db"
 import { generateAndSaveImage } from "../../lib/ai/images"
+import { resolveWorkspaceApiKey } from "../../lib/api-vault"
 import type { JobErrorType } from "@prisma/client"
 
 interface ImageJobData {
@@ -95,9 +96,14 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     imageTemplate
   )
 
+  const [openaiKey, googleAiKey] = await Promise.all([
+    resolveWorkspaceApiKey(article.project.workspaceId, "openaiKey", process.env.OPENAI_API_KEY),
+    resolveWorkspaceApiKey(article.project.workspaceId, "googleAiKey", process.env.GOOGLE_AI_API_KEY),
+  ])
+
   let imagePath: string
   try {
-    imagePath = await generateAndSaveImage(prompt, articleId)
+    imagePath = await generateAndSaveImage(prompt, articleId, { openaiKey, googleAiKey })
   } catch (err) {
     const errorType = classifyImageError(err)
     const errorMsg = err instanceof Error ? err.message : "Unknown error"

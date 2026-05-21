@@ -1,8 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { buildSystemPrompt, buildUserPrompt } from "./prompts"
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
 export interface GenerateArticleParams {
   keyword: string
   projectName: string
@@ -14,6 +12,7 @@ export interface GenerateArticleParams {
   intent?: string | null
   cluster?: string | null
   customPromptTemplate?: string | null
+  apiKey?: string
 }
 
 export interface GeneratedArticle {
@@ -38,6 +37,7 @@ function stripJsonFences(raw: string): string {
 export async function generateArticle(
   params: GenerateArticleParams
 ): Promise<GeneratedArticle> {
+  const client = new Anthropic({ apiKey: params.apiKey ?? process.env.ANTHROPIC_API_KEY })
   const systemPrompt = buildSystemPrompt()
   const userPrompt = buildUserPrompt(params)
 

@@ -1,6 +1,7 @@
 import type { Job } from "bullmq"
 import { db } from "../../lib/db"
 import { generateArticle } from "../../lib/ai/claude"
+import { resolveWorkspaceApiKey } from "../../lib/api-vault"
 import type { JobErrorType } from "@prisma/client"
 
 interface ArticleJobData {
@@ -56,6 +57,12 @@ export async function processArticleJob(job: Job<ArticleJobData>): Promise<void>
 
   const customTemplate = templates[0]?.content ?? null
 
+  const anthropicKey = await resolveWorkspaceApiKey(
+    project.workspaceId,
+    "anthropicKey",
+    process.env.ANTHROPIC_API_KEY
+  )
+
   let generated
   try {
     generated = await generateArticle({
@@ -69,6 +76,7 @@ export async function processArticleJob(job: Job<ArticleJobData>): Promise<void>
       intent: keyword.intent,
       cluster: keyword.cluster,
       customPromptTemplate: customTemplate,
+      apiKey: anthropicKey,
     })
   } catch (err) {
     const errorType = classifyError(err)

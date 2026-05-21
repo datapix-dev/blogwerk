@@ -18,6 +18,19 @@ model Workspace {
   apiConnections   ApiConnection[]
   usage            WorkspaceUsage[]
   searchConsole    SearchConsoleConnection?
+  apiKeyVault      ApiKeyVault?
+}
+
+model ApiKeyVault {
+  id            String    @id @default(cuid())
+  workspaceId   String    @unique
+  anthropicKey  String?
+  openaiKey     String?
+  googleAiKey   String?
+  nanoBananaKey String?
+  updatedAt     DateTime  @updatedAt
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 model WorkspaceUsage {
