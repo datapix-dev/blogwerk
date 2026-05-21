@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk"
+import { jsonrepair } from "jsonrepair"
 import { buildSystemPrompt, buildUserPrompt } from "./prompts"
 
 export interface GenerateArticleParams {
@@ -34,27 +35,6 @@ function stripJsonFences(raw: string): string {
     .trim()
 }
 
-// Escape literal newlines/tabs inside JSON string values so JSON.parse succeeds
-// when Claude emits multi-line HTML/markdown within a string field.
-function fixUnescapedControlChars(raw: string): string {
-  let inString = false
-  let escaped = false
-  let out = ""
-  for (let i = 0; i < raw.length; i++) {
-    const c = raw[i]
-    if (escaped) { out += c; escaped = false; continue }
-    if (c === "\\") { escaped = true; out += c; continue }
-    if (c === '"') { inString = !inString; out += c; continue }
-    if (inString) {
-      if (c === "\n") { out += "\\n"; continue }
-      if (c === "\r") { out += "\\r"; continue }
-      if (c === "\t") { out += "\\t"; continue }
-    }
-    out += c
-  }
-  return out
-}
-
 export async function generateArticle(
   params: GenerateArticleParams
 ): Promise<GeneratedArticle> {
@@ -74,23 +54,11 @@ export async function generateArticle(
     throw new Error("Unexpected response type from Claude API")
   }
 
-  if (message.stop_reason === "max_tokens") {
-    console.warn(`[claude] Response truncated at max_tokens (${rawContent.text.length} chars)`)
-  }
-
   const cleaned = stripJsonFences(rawContent.text)
   let parsed: Record<string, unknown>
   try {
-    parsed = JSON.parse(fixUnescapedControlChars(cleaned))
-  } catch (parseErr) {
-    const errMsg = parseErr instanceof Error ? parseErr.message : String(parseErr)
-    const posMatch = errMsg.match(/position (\d+)/)
-    const pos = posMatch ? parseInt(posMatch[1]) : -1
-    console.error(`[claude] JSON parse error: ${errMsg}`)
-    if (pos >= 0) {
-      const fixed = fixUnescapedControlChars(cleaned)
-      console.error(`[claude] Context at pos ${pos}: ...${JSON.stringify(fixed.slice(Math.max(0, pos - 50), pos + 50))}...`)
-    }
+    parsed = JSON.parse(jsonrepair(cleaned))
+  } catch {
     throw new Error(`Failed to parse Claude response as JSON: ${cleaned.slice(0, 200)}`)
   }
 
