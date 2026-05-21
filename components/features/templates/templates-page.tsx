@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Plus, FileText, AlignLeft, Image, MoreHorizontal, CheckCircle2 } from "lucide-react"
+import { Plus, FileText, AlignLeft, Image, MoreHorizontal, CheckCircle2, Brain } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -42,9 +42,10 @@ interface TemplatesPageProps {
 }
 
 const TEMPLATE_SECTIONS: { type: TemplateType; label: string; icon: React.ElementType }[] = [
-  { type: "ARTICLE", label: "Article Generation", icon: FileText },
-  { type: "FORMATTING", label: "Formatting", icon: AlignLeft },
-  { type: "IMAGE", label: "Image Generation", icon: Image },
+  { type: "ARTICLE",    label: "Article Generation", icon: FileText },
+  { type: "EDITORIAL",  label: "Editorial Brain",    icon: Brain },
+  { type: "FORMATTING", label: "Blog Formatting",    icon: AlignLeft },
+  { type: "IMAGE",      label: "Image Generation",   icon: Image },
 ]
 
 export function TemplatesPage({ projects, initialProjectId, initialTemplates }: TemplatesPageProps) {
