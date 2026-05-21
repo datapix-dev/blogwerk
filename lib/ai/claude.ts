@@ -74,11 +74,18 @@ export async function generateArticle(
     throw new Error("Unexpected response type from Claude API")
   }
 
+  if (message.stop_reason === "max_tokens") {
+    console.warn(`[claude] Response truncated at max_tokens (${rawContent.text.length} chars)`)
+  }
+
   const cleaned = stripJsonFences(rawContent.text)
   let parsed: Record<string, unknown>
   try {
     parsed = JSON.parse(fixUnescapedControlChars(cleaned))
-  } catch {
+  } catch (parseErr) {
+    console.error(`[claude] JSON parse failed. stop_reason=${message.stop_reason} length=${cleaned.length}`)
+    console.error(`[claude] First 300: ${cleaned.slice(0, 300)}`)
+    console.error(`[claude] Last 300: ${cleaned.slice(-300)}`)
     throw new Error(`Failed to parse Claude response as JSON: ${cleaned.slice(0, 200)}`)
   }
 
