@@ -10,22 +10,29 @@ import {
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import type { Role } from "@prisma/client"
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/projects", label: "Projects", icon: FolderKanban },
-  { href: "/keywords", label: "Keywords", icon: Tags },
-  { href: "/articles", label: "Articles", icon: FileText },
-  { href: "/ai-templates", label: "AI Templates", icon: Sparkles },
-  { href: "/connections", label: "Connections", icon: Plug },
-  { href: "/reports", label: "Reports", icon: BarChart3 },
-  { href: "/users", label: "Users", icon: Users },
-  { href: "/settings", label: "Settings", icon: Settings },
+const ALL_NAV = [
+  { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard, roles: ["ADMIN","PROJECT_MANAGER","EDITOR","CUSTOMER"] },
+  { href: "/projects",     label: "Projects",     icon: FolderKanban,    roles: ["ADMIN","PROJECT_MANAGER","EDITOR"] },
+  { href: "/keywords",     label: "Keywords",     icon: Tags,            roles: ["ADMIN","PROJECT_MANAGER","EDITOR"] },
+  { href: "/articles",     label: "Articles",     icon: FileText,        roles: ["ADMIN","PROJECT_MANAGER","EDITOR"] },
+  { href: "/ai-templates", label: "AI Templates", icon: Sparkles,        roles: ["ADMIN","PROJECT_MANAGER"] },
+  { href: "/connections",  label: "Connections",  icon: Plug,            roles: ["ADMIN","PROJECT_MANAGER"] },
+  { href: "/reports",      label: "Reports",      icon: BarChart3,       roles: ["ADMIN","PROJECT_MANAGER","EDITOR","CUSTOMER"] },
+  { href: "/users",        label: "Users",        icon: Users,           roles: ["ADMIN"] },
+  { href: "/settings",     label: "Settings",     icon: Settings,        roles: ["ADMIN","PROJECT_MANAGER","EDITOR","CUSTOMER"] },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  role: Role
+}
+
+export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+
+  const navItems = ALL_NAV.filter((item) => item.roles.includes(role))
 
   return (
     <TooltipProvider delay={0}>

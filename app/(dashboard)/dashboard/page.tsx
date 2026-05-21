@@ -2,6 +2,8 @@ import Link from "next/link"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { FileText, FolderOpen, Users, Link2 } from "lucide-react"
+import { getCustomerData } from "@/server/actions/customer"
+import { CustomerDashboard } from "@/components/features/customer/customer-dashboard"
 import type { ArticleStatus } from "@prisma/client"
 
 export const metadata = { title: "Dashboard — BlogPlanner" }
@@ -52,6 +54,17 @@ export default async function DashboardPage() {
   const session = await auth()
   const workspaceId = session?.user?.workspaceId
   if (!workspaceId) return null
+
+  // CUSTOMER role gets a simplified read-only view
+  if (session?.user?.role === "CUSTOMER") {
+    const data = await getCustomerData()
+    return (
+      <CustomerDashboard
+        data={data}
+        userName={session.user.name ?? null}
+      />
+    )
+  }
 
   const currentMonth = new Date().toISOString().slice(0, 7)
 
