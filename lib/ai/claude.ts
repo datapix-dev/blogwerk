@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { jsonrepair } from "jsonrepair"
-import { buildSystemPrompt, buildUserPrompt, buildAdaptationSystemPrompt, buildAdaptationUserPrompt } from "./prompts"
+import { buildSystemPrompt, buildUserPrompt, buildAdaptationSystemPrompt, buildAdaptationUserPrompt, buildEditorialSystemPrompt, buildEditorialUserPrompt } from "./prompts"
 
 // ─── Content Block Types ──────────────────────────────────────────────────────
 
@@ -123,6 +123,30 @@ export interface InternalLinkSuggestion { anchorText: string; suggestedTopic: st
 // ─── Legacy types kept for backward compat (old articles may have them in DB) ─
 export interface FaqSuggestion  { question: string; answer: string }
 export interface CtaSuggestion  { position: string; text: string }
+
+// ─── Editorial Enhancement Types ─────────────────────────────────────────────
+
+export interface EnhanceArticleParams {
+  blocks: ContentBlock[]
+  keyword: string
+  language: string
+  intent?: string | null
+  targetAudience?: string | null
+  toneOfVoice?: string | null
+  editorialBrain: string
+  apiKey?: string
+}
+
+export interface EditorialChange {
+  blockIndex: number
+  changeType: string
+  summary: string
+}
+
+export interface EnhancedArticle {
+  blocks: ContentBlock[]
+  editorialChanges: EditorialChange[]
+}
 
 // ─── Generation ───────────────────────────────────────────────────────────────
 
@@ -267,5 +291,39 @@ export async function adaptArticle(params: AdaptArticleParams): Promise<AdaptedA
   return {
     contentHtml: parsed.contentHtml as string,
     contentMarkdown: parsed.contentMarkdown as string,
+  }
+}
+
+// ─── enhanceArticle ───────────────────────────────────────────────────────────
+
+export async function enhanceArticle(params: EnhanceArticleParams): Promise<EnhancedArticle> {
+  const client = new Anthropic({ apiKey: params.apiKey ?? process.env.ANTHROPIC_API_KEY })
+
+  const message = await client.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 8192,
+    system: buildEditorialSystemPrompt(params.editorialBrain),
+    messages: [{ role: "user", content: buildEditorialUserPrompt(params) }],
+  })
+
+  const rawContent = message.content[0]
+  if (rawContent.type !== "text") throw new Error("Unexpected response type from Claude API")
+
+  const cleaned = stripJsonFences(rawContent.text)
+  let parsed: Record<string, unknown>
+  try {
+    parsed = JSON.parse(jsonrepair(cleaned))
+  } catch {
+    throw new Error(`Failed to parse Claude editorial response: ${cleaned.slice(0, 200)}`)
+  }
+
+  const blocks = parseArray<ContentBlock>(parsed.blocks)
+  if (!blocks.length) {
+    throw new Error("Claude editorial response contains no blocks")
+  }
+
+  return {
+    blocks,
+    editorialChanges: parseArray<EditorialChange>(parsed.editorialChanges),
   }
 }

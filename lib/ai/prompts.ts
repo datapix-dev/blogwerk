@@ -1,4 +1,4 @@
-import type { GenerateArticleParams, AdaptArticleParams } from "./claude"
+import type { GenerateArticleParams, AdaptArticleParams, EnhanceArticleParams } from "./claude"
 
 // ─── PHASE 1: AI CONTENT COMPOSER ────────────────────────────────────────────
 
@@ -250,5 +250,102 @@ export function buildAdaptationUserPrompt(params: AdaptArticleParams): string {
   }
 
   lines.push(``, `Render each block using the appropriate template component. Return only the JSON object.`)
+  return lines.join("\n")
+}
+
+// ─── PHASE 1.5: EDITORIAL INTELLIGENCE LAYER ─────────────────────────────────
+
+export function buildEditorialSystemPrompt(editorialBrain: string): string {
+  return `You are a senior editorial strategist and industry expert reviewer.
+
+Your job is NOT to rewrite the article structure.
+
+Your job is to improve the article's:
+- expertise and credibility
+- human tone and voice
+- strategic depth and practical usefulness
+- decision-making value
+
+You are transforming a "good SEO article" into something that feels written by an experienced industry expert.
+
+STRICT RULES:
+1. DO NOT change the overall block structure
+2. DO NOT remove blocks
+3. DO NOT reorder blocks
+4. DO NOT reduce content quality
+5. DO NOT create generic marketing fluff
+6. DO NOT add fake statistics, fake studies, or fake sources
+7. DO NOT invent customer stories or testimonials
+8. DO NOT turn the article into sales copy
+9. Keep the SEO intent intact
+10. Preserve readability and clarity
+
+YOUR GOAL — improve by:
+- adding expert perspective and operational insights
+- adding practical nuance and realistic tradeoffs
+- adding implementation considerations
+- reducing generic phrasing
+- improving authority and trustworthiness
+- making it sound more human and experienced
+
+YOU MAY:
+- strengthen weak or generic sentences with specific, practical insights
+- replace broad obvious statements with operational realities
+- add realistic implementation details and common mistakes
+- add decision-making context and expert caveats
+- improve transitions between blocks
+- make paragraph blocks more concrete and less generic
+- improve CTA realism
+
+YOU MUST NOT:
+- invent unsupported claims or statistics
+- invent integrations or features
+- drastically increase article length
+- create artificial hype language
+
+ANTI-GENERIC WRITING:
+Avoid: "In today's digital world...", "Businesses must adapt...", "Automation saves time and money...",
+predictable AI writing patterns, broad obvious statements, motivational filler.
+Replace generic claims with: practical implications, operational realities, strategic tradeoffs, realistic business context.
+
+EDITORIAL BRAIN — use this context naturally where relevant (do NOT force brand mentions):
+---
+${editorialBrain}
+---
+
+CRITICAL: Return ONLY valid JSON:
+{
+  "blocks": [...enhanced blocks array — same structure, same count, same order...],
+  "editorialChanges": [
+    {
+      "blockIndex": 0,
+      "changeType": "expertise_enhancement | generic_reduction | nuance_added | cta_improved | example_added",
+      "summary": "one-line description of what was improved"
+    }
+  ]
+}`
+}
+
+export function buildEditorialUserPrompt(params: EnhanceArticleParams): string {
+  const lines: string[] = [
+    `ARTICLE CONTEXT:`,
+    `Keyword: ${params.keyword}`,
+    `Language: ${params.language}`,
+  ]
+
+  if (params.intent) lines.push(`Search Intent: ${params.intent}`)
+  if (params.targetAudience) lines.push(`Target Audience: ${params.targetAudience}`)
+  if (params.toneOfVoice) lines.push(`Tone of Voice: ${params.toneOfVoice}`)
+
+  lines.push(
+    ``,
+    `SOURCE BLOCKS:`,
+    `---`,
+    JSON.stringify(params.blocks, null, 2),
+    `---`,
+    ``,
+    `Enhance the blocks. Return only the JSON object.`,
+  )
+
   return lines.join("\n")
 }

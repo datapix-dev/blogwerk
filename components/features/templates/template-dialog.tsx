@@ -27,7 +27,8 @@ import type { TemplateType } from "@prisma/client"
 
 const TEMPLATE_TYPE_LABELS: Record<TemplateType, string> = {
   ARTICLE: "Article Generation",
-  FORMATTING: "Formatting",
+  EDITORIAL: "Editorial Brain",
+  FORMATTING: "Blog Formatting",
   IMAGE: "Image Generation",
 }
 

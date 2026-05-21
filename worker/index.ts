@@ -3,6 +3,7 @@ import { redis } from "../lib/redis"
 import { processArticleJob } from "./processors/article"
 import { processImageJob } from "./processors/image"
 import { processAdaptationJob } from "./processors/adaptation"
+import { processEditorialJob } from "./processors/editorial"
 import { processPublishJob } from "./processors/publish"
 
 console.log("BlogPlanner Worker starting...")
@@ -35,6 +36,16 @@ const imageWorker = new Worker(
   }
 )
 
+const editorialWorker = new Worker(
+  "article-editorial",
+  async (job) => { await processEditorialJob(job) },
+  {
+    connection: redis,
+    concurrency: 2,
+    settings: { backoffStrategy: (n: number) => Math.pow(2, n) * 5000 },
+  }
+)
+
 const adaptationWorker = new Worker(
   "article-adaptation",
   async (job) => { await processAdaptationJob(job) },
@@ -64,6 +75,12 @@ imageWorker.on("completed", (job) =>
 )
 imageWorker.on("failed", (job, err) =>
   console.error(`[image-generation] Job ${job?.id} failed:`, err.message)
+)
+editorialWorker.on("completed", (job) =>
+  console.log(`[article-editorial] Job ${job.id} completed`)
+)
+editorialWorker.on("failed", (job, err) =>
+  console.error(`[article-editorial] Job ${job?.id} failed:`, err.message)
 )
 adaptationWorker.on("completed", (job) =>
   console.log(`[article-adaptation] Job ${job.id} completed`)

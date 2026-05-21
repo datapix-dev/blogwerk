@@ -21,6 +21,16 @@ export const imageGenerationQueue = new Queue("image-generation", {
   },
 })
 
+export const editorialQueue = new Queue("article-editorial", {
+  connection: redis,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "exponential", delay: 5000 },
+    removeOnComplete: 100,
+    removeOnFail: 500,
+  },
+})
+
 export const adaptationQueue = new Queue("article-adaptation", {
   connection: redis,
   defaultJobOptions: {

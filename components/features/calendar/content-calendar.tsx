@@ -19,6 +19,7 @@ import type { ArticleStatus } from "@prisma/client"
 const STATUS_COLORS: Record<ArticleStatus, string> = {
   DRAFT: "bg-zinc-100 text-zinc-600 border-zinc-200",
   AI_GENERATED: "bg-blue-50 text-blue-700 border-blue-200",
+  AI_ENHANCED: "bg-sky-50 text-sky-700 border-sky-200",
   ADAPTED: "bg-indigo-50 text-indigo-700 border-indigo-200",
   NEEDS_REVIEW: "bg-amber-50 text-amber-700 border-amber-200",
   APPROVED: "bg-green-50 text-green-700 border-green-200",
@@ -30,6 +31,7 @@ const STATUS_COLORS: Record<ArticleStatus, string> = {
 const STATUS_DOT: Record<ArticleStatus, string> = {
   DRAFT: "bg-zinc-400",
   AI_GENERATED: "bg-blue-500",
+  AI_ENHANCED: "bg-sky-500",
   ADAPTED: "bg-indigo-500",
   NEEDS_REVIEW: "bg-amber-500",
   APPROVED: "bg-green-500",

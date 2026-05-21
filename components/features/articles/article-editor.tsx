@@ -23,6 +23,7 @@ import {
   generateArticleAction,
 } from "@/server/actions/articles"
 import { adaptArticleAction } from "@/server/actions/adaptation"
+import { enhanceArticleAction } from "@/server/actions/editorial"
 import { publishArticleAction } from "@/server/actions/publish"
 import { getConnectionByProject } from "@/server/actions/connections"
 import type { ConnectionWithProject } from "@/server/actions/connections"
@@ -48,6 +49,7 @@ import {
   MessageSquare,
   Link2,
   Megaphone,
+  Sparkles,
 } from "lucide-react"
 
 type FaqItem = { question: string; answer: string }
@@ -136,9 +138,12 @@ function SuggestionsPanel({ article }: { article: ArticleWithRelations }) {
   )
 }
 
+type EditorialChange = { blockIndex: number; changeType: string; summary: string }
+
 interface ArticleEditorProps {
   article: ArticleWithRelations
   hasAdaptationTemplate?: boolean
+  hasEditorialTemplate?: boolean
 }
 
 type ContentView = "preview" | "html" | "markdown"
@@ -153,7 +158,7 @@ const ERROR_TYPE_MESSAGES: Record<string, string> = {
   UNKNOWN: "Unknown error",
 }
 
-export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate = false }: ArticleEditorProps) {
+export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate = false, hasEditorialTemplate = false }: ArticleEditorProps) {
   const router = useRouter()
 
   const [title, setTitle] = React.useState(initialArticle.title ?? "")
@@ -182,6 +187,12 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
   const [imageCacheBust, setImageCacheBust] = React.useState(Date.now())
   const [adapting, setAdapting] = React.useState(false)
   const [adaptationPending, setAdaptationPending] = React.useState(false)
+  const [enhancing, setEnhancing] = React.useState(false)
+  const [editorialPending, setEditorialPending] = React.useState(() =>
+    initialArticle.generationJobs.some(
+      (j) => j.type === "EDITORIAL_ENHANCEMENT" && (j.status === "PENDING" || j.status === "PROCESSING")
+    )
+  )
 
   const { data: adaptationStatus } = useSWR(
     adaptationPending ? `/api/articles/${initialArticle.id}/adaptation-status` : null,
@@ -198,6 +209,38 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
         data?.jobStatus === "COMPLETED" || data?.jobStatus === "FAILED" ? 0 : 3000,
     }
   )
+
+  const { data: editorialStatus } = useSWR(
+    editorialPending ? `/api/articles/${initialArticle.id}/editorial-status` : null,
+    (url: string) => fetch(url).then((r) => r.json()) as Promise<{
+      articleStatus: string
+      contentHtml: string | null
+      contentMarkdown: string | null
+      jobStatus: string | null
+      errorType: string | null
+      errorMsg: string | null
+      editorialChanges: EditorialChange[] | null
+    }>,
+    {
+      refreshInterval: (data) =>
+        data?.jobStatus === "COMPLETED" || data?.jobStatus === "FAILED" ? 0 : 3000,
+    }
+  )
+
+  React.useEffect(() => {
+    if (editorialStatus?.jobStatus === "COMPLETED") {
+      setEditorialPending(false)
+      if (editorialStatus.contentHtml) setContentHtml(editorialStatus.contentHtml)
+      if (editorialStatus.contentMarkdown) setContentMarkdown(editorialStatus.contentMarkdown)
+      setStatus("AI_ENHANCED")
+      const count = editorialStatus.editorialChanges?.length ?? 0
+      toast.success(`Editorial enhancement complete. ${count} improvements applied.`)
+      router.refresh()
+    } else if (editorialStatus?.jobStatus === "FAILED") {
+      setEditorialPending(false)
+      toast.error("Editorial enhancement failed. You can retry manually.")
+    }
+  }, [editorialStatus?.jobStatus, editorialStatus?.contentHtml, editorialStatus?.contentMarkdown, router])
 
   React.useEffect(() => {
     if (adaptationStatus?.jobStatus === "COMPLETED") {
@@ -359,6 +402,23 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
     }
   }
 
+  async function handleEnhance() {
+    setEnhancing(true)
+    try {
+      const result = await enhanceArticleAction(initialArticle.id)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      setEditorialPending(true)
+      toast.success("Editorial enhancement started…")
+    } catch {
+      toast.error("Failed to start editorial enhancement.")
+    } finally {
+      setEnhancing(false)
+    }
+  }
+
   async function handleAdapt() {
     setAdapting(true)
     try {
@@ -411,8 +471,8 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
     }
   }
 
-  const canApprove = status === "AI_GENERATED" || status === "ADAPTED" || status === "NEEDS_REVIEW"
-  const canRequestReview = status === "AI_GENERATED" || status === "ADAPTED" || status === "APPROVED"
+  const canApprove = status === "AI_GENERATED" || status === "AI_ENHANCED" || status === "ADAPTED" || status === "NEEDS_REVIEW"
+  const canRequestReview = status === "AI_GENERATED" || status === "AI_ENHANCED" || status === "ADAPTED" || status === "APPROVED"
 
   return (
     <TooltipProvider>
@@ -511,6 +571,30 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
                   : "No keyword linked — cannot regenerate"}
               </TooltipContent>
             </Tooltip>
+
+            {hasEditorialTemplate && contentHtml && (
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 border-sky-200 text-sky-700 hover:bg-sky-50"
+                    disabled={enhancing || editorialPending}
+                    onClick={handleEnhance}
+                  >
+                    {enhancing || editorialPending ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    {editorialPending ? "Enhancing…" : status === "AI_ENHANCED" ? "Re-enhance" : "Enhance"}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Apply Editorial Intelligence — expert voice, practical depth, anti-generic
+                </TooltipContent>
+              </Tooltip>
+            )}
 
             {hasAdaptationTemplate && contentHtml && (
               <Tooltip>

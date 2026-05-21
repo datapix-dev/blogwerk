@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { getArticleById } from "@/server/actions/articles"
 import { getAdaptationTemplateStatus } from "@/server/actions/adaptation"
+import { getEditorialTemplateStatus } from "@/server/actions/editorial"
 import { ArticleEditor } from "@/components/features/articles/article-editor"
 
 export const metadata = { title: "Article — BlogPlanner" }
@@ -14,11 +15,19 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const article = await getArticleById(id)
   if (!article) notFound()
 
-  const { hasTemplate } = await getAdaptationTemplateStatus(article.projectId)
+  const [{ hasTemplate: hasAdaptationTemplate }, { hasTemplate: hasEditorialTemplate }] =
+    await Promise.all([
+      getAdaptationTemplateStatus(article.projectId),
+      getEditorialTemplateStatus(article.projectId),
+    ])
 
   return (
     <div className="space-y-5">
-      <ArticleEditor article={article} hasAdaptationTemplate={hasTemplate} />
+      <ArticleEditor
+        article={article}
+        hasAdaptationTemplate={hasAdaptationTemplate}
+        hasEditorialTemplate={hasEditorialTemplate}
+      />
     </div>
   )
 }

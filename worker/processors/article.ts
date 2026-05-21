@@ -2,6 +2,7 @@ import type { Job } from "bullmq"
 import { db } from "../../lib/db"
 import { generateArticle } from "../../lib/ai/claude"
 import { resolveWorkspaceApiKey } from "../../lib/api-vault"
+import { editorialQueue } from "../queues/index"
 import type { JobErrorType } from "@prisma/client"
 
 interface ArticleJobData {
@@ -141,4 +142,28 @@ export async function processArticleJob(job: Job<ArticleJobData>): Promise<void>
   ])
 
   console.log(`[article-processor] Article ${articleId} generated: "${generated.title}"`)
+
+  // Auto-queue Phase 1.5 if an EDITORIAL template exists for this project
+  const editorialTemplate = await db.promptTemplate.findFirst({
+    where: { projectId, type: "EDITORIAL", isActive: true },
+    select: { id: true },
+  })
+
+  if (editorialTemplate) {
+    const editorialJob = await db.generationJob.create({
+      data: {
+        articleId,
+        type: "EDITORIAL_ENHANCEMENT",
+        status: "PENDING",
+        payload: { projectId },
+      },
+      select: { id: true },
+    })
+    await editorialQueue.add(
+      "enhance",
+      { articleId, projectId },
+      { jobId: editorialJob.id, attempts: 2, backoff: { type: "exponential", delay: 5000 } }
+    )
+    console.log(`[article-processor] Queued editorial enhancement for article ${articleId}`)
+  }
 }

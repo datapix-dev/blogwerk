@@ -187,6 +187,7 @@ model Article {
 enum ArticleStatus {
   DRAFT
   AI_GENERATED
+  AI_ENHANCED
   ADAPTED
   NEEDS_REVIEW
   APPROVED
@@ -210,6 +211,7 @@ model PromptTemplate {
 
 enum TemplateType {
   ARTICLE
+  EDITORIAL
   FORMATTING
   IMAGE
 }
@@ -253,6 +255,7 @@ model GenerationJob {
 enum JobType {
   ARTICLE_GENERATION
   IMAGE_GENERATION
+  EDITORIAL_ENHANCEMENT
   ADAPTATION
   PUBLISH
 }
