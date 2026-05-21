@@ -34,6 +34,27 @@ function stripJsonFences(raw: string): string {
     .trim()
 }
 
+// Escape literal newlines/tabs inside JSON string values so JSON.parse succeeds
+// when Claude emits multi-line HTML/markdown within a string field.
+function fixUnescapedControlChars(raw: string): string {
+  let inString = false
+  let escaped = false
+  let out = ""
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i]
+    if (escaped) { out += c; escaped = false; continue }
+    if (c === "\\") { escaped = true; out += c; continue }
+    if (c === '"') { inString = !inString; out += c; continue }
+    if (inString) {
+      if (c === "\n") { out += "\\n"; continue }
+      if (c === "\r") { out += "\\r"; continue }
+      if (c === "\t") { out += "\\t"; continue }
+    }
+    out += c
+  }
+  return out
+}
+
 export async function generateArticle(
   params: GenerateArticleParams
 ): Promise<GeneratedArticle> {
@@ -56,7 +77,7 @@ export async function generateArticle(
   const cleaned = stripJsonFences(rawContent.text)
   let parsed: Record<string, unknown>
   try {
-    parsed = JSON.parse(cleaned)
+    parsed = JSON.parse(fixUnescapedControlChars(cleaned))
   } catch {
     throw new Error(`Failed to parse Claude response as JSON: ${cleaned.slice(0, 200)}`)
   }
