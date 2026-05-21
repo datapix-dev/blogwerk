@@ -1,6 +1,7 @@
 import { Worker } from "bullmq"
 import { redis } from "../lib/redis"
 import { processArticleJob } from "./processors/article"
+import { processPublishJob } from "./processors/publish"
 
 console.log("BlogPlanner Worker starting...")
 
@@ -30,8 +31,7 @@ const imageWorker = new Worker(
 const publishWorker = new Worker(
   "publish",
   async (job) => {
-    console.log(`[publish] Processing job ${job.id}`)
-    return { status: "stub" }
+    await processPublishJob(job)
   },
   { connection: redis, concurrency: 2 }
 )

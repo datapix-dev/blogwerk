@@ -22,6 +22,9 @@ import {
   updateArticleStatus,
   generateArticleAction,
 } from "@/server/actions/articles"
+import { publishArticleAction } from "@/server/actions/publish"
+import { getConnectionByProject } from "@/server/actions/connections"
+import type { ConnectionWithProject } from "@/server/actions/connections"
 import type { ArticleWithRelations } from "@/server/actions/articles"
 import type { ArticleStatus } from "@prisma/client"
 import {
@@ -35,6 +38,7 @@ import {
   ChevronLeft,
   Loader2,
   AlertCircle,
+  Send,
 } from "lucide-react"
 
 interface ArticleEditorProps {
@@ -74,6 +78,24 @@ export function ArticleEditor({ article: initialArticle }: ArticleEditorProps) {
   const [saving, setSaving] = React.useState(false)
   const [approvingStatus, setApprovingStatus] = React.useState<string | null>(null)
   const [regenerating, setRegenerating] = React.useState(false)
+  const [connection, setConnection] = React.useState<ConnectionWithProject | null>(null)
+  const [connectionLoading, setConnectionLoading] = React.useState(false)
+  const [publishing, setPublishing] = React.useState(false)
+
+  React.useEffect(() => {
+    async function loadConnection() {
+      setConnectionLoading(true)
+      try {
+        const conn = await getConnectionByProject(initialArticle.projectId)
+        setConnection(conn)
+      } catch {
+        // not critical
+      } finally {
+        setConnectionLoading(false)
+      }
+    }
+    loadConnection()
+  }, [initialArticle.projectId])
 
   const isDirty = React.useMemo(
     () =>
@@ -174,6 +196,24 @@ export function ArticleEditor({ article: initialArticle }: ArticleEditorProps) {
       toast.error("Failed to start regeneration.")
     } finally {
       setRegenerating(false)
+    }
+  }
+
+  async function handlePublish() {
+    if (!connection?.id) return
+    setPublishing(true)
+    try {
+      const result = await publishArticleAction(initialArticle.id, connection.id)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      toast.success("Publish job queued. Article will be published shortly.")
+      router.refresh()
+    } catch {
+      toast.error("Failed to start publish.")
+    } finally {
+      setPublishing(false)
     }
   }
 
@@ -306,6 +346,9 @@ export function ArticleEditor({ article: initialArticle }: ArticleEditorProps) {
             </TabsTrigger>
             <TabsTrigger value="info" className="text-xs h-6 px-3">
               Info
+            </TabsTrigger>
+            <TabsTrigger value="publish" className="text-xs h-6 px-3">
+              Publish
             </TabsTrigger>
           </TabsList>
 
@@ -551,6 +594,93 @@ export function ArticleEditor({ article: initialArticle }: ArticleEditorProps) {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="publish" className="mt-4 space-y-4">
+            <div className="max-w-sm space-y-4">
+              <div>
+                <h3 className="text-sm font-medium text-zinc-900 mb-1">Publish to CMS</h3>
+                <p className="text-xs text-zinc-400">
+                  Send this article to the connected WordPress or custom API for your project.
+                </p>
+              </div>
+
+              {connectionLoading ? (
+                <div className="flex items-center gap-2 text-sm text-zinc-400">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading connection...
+                </div>
+              ) : connection ? (
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-zinc-900">
+                        {connection.type === "WORDPRESS" ? "WordPress" : "Custom API"}
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-0.5">
+                        {connection.project.blogUrl ?? "No URL set"}
+                      </p>
+                    </div>
+                    {connection.isVerified ? (
+                      <span className="text-xs text-emerald-600 font-medium">Verified</span>
+                    ) : (
+                      <span className="text-xs text-amber-600 font-medium">Not verified</span>
+                    )}
+                  </div>
+
+                  {!connection.isVerified && (
+                    <p className="text-xs text-amber-600">
+                      This connection is not verified. Go to{" "}
+                      <a href="/connections" className="underline">
+                        Connections
+                      </a>{" "}
+                      and test it before publishing.
+                    </p>
+                  )}
+
+                  {status === "PUBLISHED" && initialArticle.url && (
+                    <div className="text-xs text-zinc-500">
+                      Published at:{" "}
+                      <a
+                        href={initialArticle.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        {initialArticle.url}
+                      </a>
+                    </div>
+                  )}
+
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    disabled={publishing || !connection.isVerified}
+                    onClick={handlePublish}
+                  >
+                    {publishing ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    {status === "PUBLISHED" ? "Re-publish" : "Publish Article"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-zinc-200 p-6 text-center space-y-2">
+                  <p className="text-sm text-zinc-500">
+                    No connection configured for this project.
+                  </p>
+                  <p className="text-xs text-zinc-400">
+                    Go to{" "}
+                    <a href="/connections" className="text-blue-600 hover:underline">
+                      Connections
+                    </a>{" "}
+                    to add one.
+                  </p>
                 </div>
               )}
             </div>
