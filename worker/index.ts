@@ -1,6 +1,7 @@
 import { Worker } from "bullmq"
 import { redis } from "../lib/redis"
 import { processArticleJob } from "./processors/article"
+import { processImageJob } from "./processors/image"
 import { processPublishJob } from "./processors/publish"
 
 console.log("BlogPlanner Worker starting...")
@@ -22,10 +23,15 @@ const articleWorker = new Worker(
 const imageWorker = new Worker(
   "image-generation",
   async (job) => {
-    console.log(`[image-generation] Processing job ${job.id}`)
-    return { status: "stub" }
+    await processImageJob(job)
   },
-  { connection: redis, concurrency: 3 }
+  {
+    connection: redis,
+    concurrency: 2,
+    settings: {
+      backoffStrategy: (attemptsMade: number) => Math.pow(2, attemptsMade) * 5000,
+    },
+  }
 )
 
 const publishWorker = new Worker(
