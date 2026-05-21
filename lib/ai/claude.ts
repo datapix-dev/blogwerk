@@ -2,11 +2,18 @@ import Anthropic from "@anthropic-ai/sdk"
 import { jsonrepair } from "jsonrepair"
 import { buildSystemPrompt, buildUserPrompt, buildAdaptationSystemPrompt, buildAdaptationUserPrompt } from "./prompts"
 
+export interface FaqSuggestion { question: string; answer: string }
+export interface InternalLinkSuggestion { anchorText: string; suggestedTopic: string }
+export interface CtaSuggestion { position: string; text: string }
+
 export interface AdaptArticleParams {
-  contentHtml: string
+  contentMarkdown: string
   adaptationTemplate: string
   keyword: string
   language: string
+  faqSuggestions?: FaqSuggestion[]
+  internalLinkSuggestions?: InternalLinkSuggestion[]
+  ctaSuggestions?: CtaSuggestion[]
   apiKey?: string
 }
 
@@ -38,6 +45,9 @@ export interface GeneratedArticle {
   metaDescription: string
   excerpt: string
   tags: string[]
+  faqSuggestions: FaqSuggestion[]
+  internalLinkSuggestions: InternalLinkSuggestion[]
+  ctaSuggestions: CtaSuggestion[]
 }
 
 function stripJsonFences(raw: string): string {
@@ -48,24 +58,24 @@ function stripJsonFences(raw: string): string {
     .trim()
 }
 
+function parseArray<T>(val: unknown): T[] {
+  return Array.isArray(val) ? (val as T[]) : []
+}
+
 export async function generateArticle(
   params: GenerateArticleParams
 ): Promise<GeneratedArticle> {
   const client = new Anthropic({ apiKey: params.apiKey ?? process.env.ANTHROPIC_API_KEY })
-  const systemPrompt = buildSystemPrompt()
-  const userPrompt = buildUserPrompt(params)
 
   const message = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 8192,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userPrompt }],
+    system: buildSystemPrompt(params.intent),
+    messages: [{ role: "user", content: buildUserPrompt(params) }],
   })
 
   const rawContent = message.content[0]
-  if (rawContent.type !== "text") {
-    throw new Error("Unexpected response type from Claude API")
-  }
+  if (rawContent.type !== "text") throw new Error("Unexpected response type from Claude API")
 
   const cleaned = stripJsonFences(rawContent.text)
   let parsed: Record<string, unknown>
@@ -75,32 +85,27 @@ export async function generateArticle(
     throw new Error(`Failed to parse Claude response as JSON: ${cleaned.slice(0, 200)}`)
   }
 
-  const required = [
-    "title",
-    "slug",
-    "contentHtml",
-    "contentMarkdown",
-    "metaTitle",
-    "metaDescription",
-    "excerpt",
-  ]
-  for (const field of required) {
+  for (const field of ["title", "slug", "contentMarkdown", "metaTitle", "metaDescription", "excerpt"]) {
     if (!parsed[field] || typeof parsed[field] !== "string") {
       throw new Error(`Missing or invalid field in Claude response: ${field}`)
     }
   }
 
+  // contentHtml is optional in Phase 1 — fall back to empty string if not provided
+  const contentHtml = typeof parsed.contentHtml === "string" ? parsed.contentHtml : ""
+
   return {
     title: parsed.title as string,
     slug: parsed.slug as string,
-    contentHtml: parsed.contentHtml as string,
+    contentHtml,
     contentMarkdown: parsed.contentMarkdown as string,
     metaTitle: parsed.metaTitle as string,
     metaDescription: parsed.metaDescription as string,
     excerpt: parsed.excerpt as string,
-    tags: Array.isArray(parsed.tags)
-      ? (parsed.tags as string[]).filter((t) => typeof t === "string")
-      : [],
+    tags: parseArray<string>(parsed.tags).filter((t) => typeof t === "string"),
+    faqSuggestions: parseArray<FaqSuggestion>(parsed.faqSuggestions),
+    internalLinkSuggestions: parseArray<InternalLinkSuggestion>(parsed.internalLinkSuggestions),
+    ctaSuggestions: parseArray<CtaSuggestion>(parsed.ctaSuggestions),
   }
 }
 

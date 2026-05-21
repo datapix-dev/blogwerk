@@ -31,6 +31,9 @@ export type ArticleWithRelations = {
   publishMode: string
   publishAt: Date | null
   url: string | null
+  faqSuggestions: unknown
+  internalLinkSuggestions: unknown
+  ctaSuggestions: unknown
   createdAt: Date
   updatedAt: Date
   project: { id: string; name: string }
@@ -67,6 +70,9 @@ const articleSelect = {
   publishMode: true,
   publishAt: true,
   url: true,
+  faqSuggestions: true,
+  internalLinkSuggestions: true,
+  ctaSuggestions: true,
   createdAt: true,
   updatedAt: true,
   project: { select: { id: true, name: true } },

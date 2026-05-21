@@ -1,6 +1,6 @@
 import type { Job } from "bullmq"
 import { db } from "../../lib/db"
-import { adaptArticle } from "../../lib/ai/claude"
+import { adaptArticle, type FaqSuggestion, type InternalLinkSuggestion, type CtaSuggestion } from "../../lib/ai/claude"
 import { resolveWorkspaceApiKey } from "../../lib/api-vault"
 
 interface AdaptationJobData {
@@ -28,7 +28,10 @@ export async function processAdaptationJob(job: Job<AdaptationJobData>): Promise
     db.article.findUnique({
       where: { id: articleId },
       select: {
-        contentHtml: true,
+        contentMarkdown: true,
+        faqSuggestions: true,
+        internalLinkSuggestions: true,
+        ctaSuggestions: true,
         project: {
           select: {
             workspaceId: true,
@@ -45,7 +48,7 @@ export async function processAdaptationJob(job: Job<AdaptationJobData>): Promise
   ])
 
   if (!article) throw new Error(`Article not found: ${articleId}`)
-  if (!article.contentHtml) throw new Error(`Article ${articleId} has no content to adapt`)
+  if (!article.contentMarkdown) throw new Error(`Article ${articleId} has no content to adapt`)
   if (!adaptationTemplate) throw new Error(`No active FORMATTING template for project ${projectId}`)
 
   const anthropicKey = await resolveWorkspaceApiKey(
@@ -57,10 +60,13 @@ export async function processAdaptationJob(job: Job<AdaptationJobData>): Promise
   let adapted
   try {
     adapted = await adaptArticle({
-      contentHtml: article.contentHtml,
+      contentMarkdown: article.contentMarkdown,
       adaptationTemplate: adaptationTemplate.content,
       keyword: article.keyword?.keyword ?? "",
       language: article.project.language,
+      faqSuggestions: article.faqSuggestions as unknown as FaqSuggestion[] | undefined,
+      internalLinkSuggestions: article.internalLinkSuggestions as unknown as InternalLinkSuggestion[] | undefined,
+      ctaSuggestions: article.ctaSuggestions as unknown as CtaSuggestion[] | undefined,
       apiKey: anthropicKey,
     })
   } catch (err) {

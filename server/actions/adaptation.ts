@@ -19,14 +19,14 @@ export async function adaptArticleAction(
     where: { id: articleId, project: { workspaceId: session.user.workspaceId } },
     select: {
       id: true,
-      contentHtml: true,
+      contentMarkdown: true,
       status: true,
       projectId: true,
     },
   })
 
   if (!article) return { success: false, error: "Article not found." }
-  if (!article.contentHtml) return { success: false, error: "Article has no content to adapt." }
+  if (!article.contentMarkdown) return { success: false, error: "Article has no content to adapt." }
 
   const template = await db.promptTemplate.findFirst({
     where: { projectId: article.projectId, type: "FORMATTING", isActive: true },

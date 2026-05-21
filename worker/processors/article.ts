@@ -113,6 +113,9 @@ export async function processArticleJob(job: Job<ArticleJobData>): Promise<void>
         excerpt: generated.excerpt,
         tags: generated.tags,
         status: "AI_GENERATED",
+      faqSuggestions: generated.faqSuggestions.length ? (generated.faqSuggestions as unknown as import("@prisma/client").Prisma.InputJsonValue) : undefined,
+      internalLinkSuggestions: generated.internalLinkSuggestions.length ? (generated.internalLinkSuggestions as unknown as import("@prisma/client").Prisma.InputJsonValue) : undefined,
+      ctaSuggestions: generated.ctaSuggestions.length ? (generated.ctaSuggestions as unknown as import("@prisma/client").Prisma.InputJsonValue) : undefined,
       },
     }),
     db.generationJob.update({

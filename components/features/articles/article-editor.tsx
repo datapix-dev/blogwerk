@@ -44,7 +44,97 @@ import {
   Send,
   ImageIcon,
   Wand2,
+  ChevronDown,
+  MessageSquare,
+  Link2,
+  Megaphone,
 } from "lucide-react"
+
+type FaqItem = { question: string; answer: string }
+type LinkItem = { anchorText: string; suggestedTopic: string }
+type CtaItem = { position: string; text: string }
+
+function SuggestionsPanel({ article }: { article: ArticleWithRelations }) {
+  const [open, setOpen] = React.useState(false)
+
+  const faqs = (article.faqSuggestions as FaqItem[] | null) ?? []
+  const links = (article.internalLinkSuggestions as LinkItem[] | null) ?? []
+  const ctas = (article.ctaSuggestions as CtaItem[] | null) ?? []
+
+  if (!faqs.length && !links.length && !ctas.length) return null
+
+  return (
+    <div className="border border-zinc-200 rounded-xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-zinc-50 hover:bg-zinc-100 transition-colors text-left"
+      >
+        <span className="text-xs font-semibold text-zinc-600 uppercase tracking-wide">
+          SEO Suggestions from Phase 1
+        </span>
+        <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="p-4 space-y-5 bg-white">
+          {faqs.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+                <MessageSquare className="w-3.5 h-3.5" /> FAQ Suggestions
+              </div>
+              <div className="space-y-2">
+                {faqs.map((f, i) => (
+                  <div key={i} className="rounded-lg bg-zinc-50 border border-zinc-100 px-3 py-2.5 space-y-1">
+                    <p className="text-xs font-semibold text-zinc-800">{f.question}</p>
+                    <p className="text-xs text-zinc-500 leading-relaxed">{f.answer}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {links.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+                <Link2 className="w-3.5 h-3.5" /> Internal Link Suggestions
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {links.map((l, i) => (
+                  <div key={i} className="rounded-md bg-blue-50 border border-blue-100 px-2.5 py-1.5 text-xs">
+                    <span className="font-medium text-blue-800">&ldquo;{l.anchorText}&rdquo;</span>
+                    <span className="text-blue-500 mx-1">→</span>
+                    <span className="text-blue-600">{l.suggestedTopic}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {ctas.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+                <Megaphone className="w-3.5 h-3.5" /> CTA Suggestions
+              </div>
+              <div className="space-y-1.5">
+                {ctas.map((c, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs">
+                    <span className="bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 font-mono shrink-0">{c.position}</span>
+                    <span className="text-zinc-600">{c.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <p className="text-[11px] text-zinc-400">
+            These suggestions are automatically used in Phase 2 (Adapt for Blog). They are derived from the article content — no invented facts.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface ArticleEditorProps {
   article: ArticleWithRelations
@@ -542,6 +632,8 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
                 spellCheck={false}
               />
             )}
+
+            <SuggestionsPanel article={initialArticle} />
           </TabsContent>
 
           <TabsContent value="seo" className="mt-4 space-y-4">

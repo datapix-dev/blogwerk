@@ -168,8 +168,11 @@ model Article {
   publishMode     PublishMode   @default(DRAFT)
   publishAt       DateTime?
   url             String?
-  targetKeywords  String[]
-  externalId      String?
+  targetKeywords          String[]
+  externalId              String?
+  faqSuggestions          Json?
+  internalLinkSuggestions Json?
+  ctaSuggestions          Json?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
