@@ -4,8 +4,6 @@ import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { encryptKey, getVaultPreview, type VaultField } from "@/lib/api-vault"
 
-export type { VaultField }
-
 async function requireAdmin() {
   const session = await auth()
   if (!session?.user?.workspaceId || session.user.role !== "ADMIN") {

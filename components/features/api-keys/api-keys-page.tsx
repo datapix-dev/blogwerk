@@ -5,7 +5,9 @@ import { Eye, EyeOff, Save, X, KeyRound, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { saveApiKeyVault, type VaultData, type VaultKeyInfo, type KeyUpdates, type VaultField } from "@/server/actions/api-keys"
+import { saveApiKeyVault, type VaultData, type VaultKeyInfo, type KeyUpdates } from "@/server/actions/api-keys"
+
+type VaultField = "anthropicKey" | "openaiKey" | "googleAiKey" | "nanoBananaKey"
 import { toast } from "sonner"
 
 const KEY_META: { field: VaultField; label: string; hint: string }[] = [
