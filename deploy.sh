@@ -1,3 +1,16 @@
 #!/bin/bash
-# Deploy: git pull auf dem Server ausführen
-ssh root@202.61.194.129 "cd /var/www/blogwerk && git pull origin main && echo 'Deploy OK'"
+set -e
+
+SERVER="root@202.61.194.129"
+DEPLOY_PATH="/var/www/blogwerk"
+
+echo "Deploying to $SERVER:$DEPLOY_PATH ..."
+
+ssh $SERVER "
+  cd $DEPLOY_PATH
+  git pull origin main
+  docker compose -f docker-compose.prod.yml build --no-cache
+  docker compose -f docker-compose.prod.yml up -d
+  docker compose -f docker-compose.prod.yml exec web npx prisma migrate deploy
+  echo 'Deploy complete'
+"
