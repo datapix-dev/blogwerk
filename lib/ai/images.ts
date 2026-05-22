@@ -47,7 +47,7 @@ async function generateWithOpenAI(prompt: string, apiKey?: string): Promise<Buff
       output_format: "webp",
       output_compression: 85,
     }),
-    signal: AbortSignal.timeout(90_000),
+    signal: AbortSignal.timeout(180_000),
   })
 
   if (!res.ok) {
