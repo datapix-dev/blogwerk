@@ -205,10 +205,16 @@ async function publishToAstroBlog(
     ? `${base}/api/blog/admin/posts/${article.externalId}`
     : `${base}/api/blog/admin/posts`
 
+  const bodyStr = JSON.stringify(payload)
+  console.log(`[publish] Astro payload blocks:`, JSON.stringify(
+    (payload.content as unknown[])?.filter((b: unknown) => (b as Record<string, unknown>).type === "citation"),
+    null, 2
+  ))
+
   const res = await fetch(endpoint, {
     method: isUpdate ? "PUT" : "POST",
     headers: { ...authHeaders, "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: bodyStr,
     signal: AbortSignal.timeout(30_000),
   })
 
