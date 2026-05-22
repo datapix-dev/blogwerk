@@ -81,26 +81,53 @@ export function KeywordImportDialog({ open, onOpenChange, projects, defaultProje
     }
   }, [open, defaultProjectId, projects])
 
+  const FIELD_ALIASES: Record<KeywordField, string[]> = {
+    keyword: ["keyword", "term", "query", "phrase", "search term", "schlüsselwort", "keywords"],
+    searchVolume: ["search volume", "volume", "vol", "sv", "searches", "search_volume", "suchvolumen", "monatliches suchvolumen"],
+    difficulty: ["difficulty", "kd", "keyword difficulty", "diff", "kd%", "seo difficulty", "schwierigkeit"],
+    intent: ["intent", "search intent", "type", "suchabsicht", "absicht"],
+    priority: ["priority", "prio", "priorität"],
+    cluster: ["cluster", "topic", "group", "category", "thema", "gruppe"],
+    targetUrl: ["target url", "url", "target", "landing page", "target_url", "ziel-url"],
+  }
+
   function autoDetectMapping(hdrs: string[]): Record<string, KeywordField | typeof SKIP_VALUE> {
     const auto: Record<string, KeywordField | typeof SKIP_VALUE> = {}
-    const aliases: Record<KeywordField, string[]> = {
-      keyword: ["keyword", "term", "query", "phrase", "search term", "schlüsselwort"],
-      searchVolume: ["search volume", "volume", "vol", "sv", "searches"],
-      difficulty: ["difficulty", "kd", "keyword difficulty", "diff"],
-      intent: ["intent", "search intent", "type"],
-      priority: ["priority", "prio"],
-      cluster: ["cluster", "topic", "group", "category"],
-      targetUrl: ["target url", "url", "target", "landing page"],
-    }
     for (const header of hdrs) {
       const h = header.toLowerCase().trim()
       let matched = false
-      for (const [field, als] of Object.entries(aliases) as [KeywordField, string[]][]) {
-        if (als.some((a) => h.includes(a) || a.includes(h))) { auto[header] = field; matched = true; break }
+      for (const [field, als] of Object.entries(FIELD_ALIASES) as [KeywordField, string[]][]) {
+        if (als.some((a) => h === a || h.includes(a) || a.includes(h))) { auto[header] = field; matched = true; break }
       }
       if (!matched) auto[header] = SKIP_VALUE
     }
     return auto
+  }
+
+  function looksLikeHeaders(values: string[]): boolean {
+    return values.some((v) => {
+      const h = v.toLowerCase().trim()
+      return Object.values(FIELD_ALIASES).some((als) => als.some((a) => h === a || h.includes(a) || a.includes(h)))
+    })
+  }
+
+  function applyParsedData(rows: Record<string, unknown>[], hdrs: string[], fileName: string) {
+    // If detected headers don't match any known field, try using first data row as headers
+    if (!looksLikeHeaders(hdrs) && rows.length > 0) {
+      const firstRowValues = Object.values(rows[0]).map((v) => String(v ?? ""))
+      if (looksLikeHeaders(firstRowValues)) {
+        const newHdrs = firstRowValues
+        const newRows = rows.slice(1).map((row) => {
+          const vals = Object.values(row)
+          return Object.fromEntries(newHdrs.map((h, i) => [h, vals[i] ?? ""]))
+        })
+        setRawRows(newRows); setHeaders(newHdrs); setMapping(autoDetectMapping(newHdrs))
+        setFileName(fileName); setStep("mapping")
+        return
+      }
+    }
+    setRawRows(rows); setHeaders(hdrs); setMapping(autoDetectMapping(hdrs))
+    setFileName(fileName); setStep("mapping")
   }
 
   function processFile(file: File) {
@@ -111,8 +138,7 @@ export function KeywordImportDialog({ open, onOpenChange, projects, defaultProje
         complete: (results) => {
           const rows = results.data as Record<string, unknown>[]
           const hdrs = results.meta.fields ?? []
-          setRawRows(rows); setHeaders(hdrs); setMapping(autoDetectMapping(hdrs))
-          setFileName(file.name); setStep("mapping")
+          applyParsedData(rows, hdrs, file.name)
         },
         error: (err) => setUploadError(`CSV parse error: ${err.message}`),
       })
@@ -127,8 +153,7 @@ export function KeywordImportDialog({ open, onOpenChange, projects, defaultProje
           const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null })
           if (!rows.length) throw new Error("No rows found.")
           const hdrs = Object.keys(rows[0])
-          setRawRows(rows); setHeaders(hdrs); setMapping(autoDetectMapping(hdrs))
-          setFileName(file.name); setStep("mapping")
+          applyParsedData(rows, hdrs, file.name)
         } catch (err) {
           setUploadError(`XLSX error: ${err instanceof Error ? err.message : String(err)}`)
         }

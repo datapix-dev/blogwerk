@@ -58,7 +58,8 @@ export function KeywordsTable({ initialData, projects, defaultProjectId }: Keywo
       ["beispiel keyword", "1000", "45", "INFORMATIONAL", "HIGH", "SEO Basics", "https://example.com/seite"],
       ["weiteres keyword", "500", "30", "COMMERCIAL", "MEDIUM", "", ""],
     ]
-    const csv = rows.map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(",")).join("\n")
+    // UTF-8 BOM ensures Excel opens with correct comma delimiter on all locales
+    const csv = "﻿" + rows.map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(",")).join("\n")
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
