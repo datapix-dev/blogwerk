@@ -79,11 +79,8 @@ export function transformBlocksToAstro(blocks: ContentBlock[]): AstroBlock[] {
           type: "citation",
           title: "Quellen",
           items: block.items.map((item) => ({
-            title: item.title,
             text: item.title,
-            label: item.title,
-            name: item.title,
-            url: item.url ?? "",
+            url: item.url ?? undefined,
           })),
         }]
 
