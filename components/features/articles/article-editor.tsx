@@ -184,7 +184,8 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
   const [publishing, setPublishing] = React.useState(false)
   const [generatingImage, setGeneratingImage] = React.useState(false)
   const [imageJobPending, setImageJobPending] = React.useState(false)
-  const [imageCacheBust, setImageCacheBust] = React.useState(Date.now())
+  const [imageCacheBust, setImageCacheBust] = React.useState(0)
+  React.useEffect(() => { setImageCacheBust(Date.now()) }, [])
   const [adapting, setAdapting] = React.useState(false)
   const [adaptationPending, setAdaptationPending] = React.useState(false)
   const [enhancing, setEnhancing] = React.useState(false)
@@ -1031,13 +1032,16 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
                     className="w-full"
                     disabled={publishing || !connection.isVerified}
                     onClick={handlePublish}
+                    title={!connection.isVerified ? "Test the connection first to enable publishing" : undefined}
                   >
                     {publishing ? (
                       <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                     ) : (
                       <Send className="w-3.5 h-3.5 mr-1.5" />
                     )}
-                    {status === "PUBLISHED" ? "Re-publish" : "Publish Article"}
+                    {!connection.isVerified
+                      ? "Connection not verified"
+                      : status === "PUBLISHED" ? "Re-publish" : "Publish Article"}
                   </Button>
                 </div>
               ) : (
