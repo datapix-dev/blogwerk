@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -190,6 +191,7 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
   const [imageAlt, setImageAlt] = React.useState(initialArticle.imageAlt ?? "")
   const [generatingAlt, setGeneratingAlt] = React.useState(false)
   const [savingAlt, setSavingAlt] = React.useState(false)
+  const [publishLive, setPublishLive] = React.useState(false)
   const [adapting, setAdapting] = React.useState(false)
   const [adaptationPending, setAdaptationPending] = React.useState(false)
   const [enhancing, setEnhancing] = React.useState(false)
@@ -445,7 +447,7 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
     if (!connection?.id) return
     setPublishing(true)
     try {
-      const result = await publishArticleAction(initialArticle.id, connection.id)
+      const result = await publishArticleAction(initialArticle.id, connection.id, publishLive)
       if (!result.success) {
         toast.error(result.error)
         return
@@ -1103,6 +1105,18 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
                     </div>
                   )}
 
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="publish-live"
+                      checked={publishLive}
+                      onCheckedChange={(v) => setPublishLive(!!v)}
+                      disabled={publishing}
+                    />
+                    <Label htmlFor="publish-live" className="text-xs text-zinc-600 cursor-pointer select-none">
+                      Direkt online stellen (nicht als Entwurf)
+                    </Label>
+                  </div>
+
                   <Button
                     size="sm"
                     className="w-full"
@@ -1117,7 +1131,9 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
                     )}
                     {!connection.isVerified
                       ? "Connection not verified"
-                      : status === "PUBLISHED" ? "Re-publish" : "Publish Article"}
+                      : status === "PUBLISHED"
+                        ? publishLive ? "Re-publish (live)" : "Re-publish (draft)"
+                        : publishLive ? "Publish live" : "Publish as draft"}
                   </Button>
                 </div>
               ) : (

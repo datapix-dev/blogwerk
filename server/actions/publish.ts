@@ -13,7 +13,8 @@ async function requireSession() {
 
 export async function publishArticleAction(
   articleId: string,
-  connectionId: string
+  connectionId: string,
+  publishLive = false
 ): Promise<{ success: true; jobId: string } | { success: false; error: string }> {
   const session = await requireSession()
 
@@ -47,14 +48,14 @@ export async function publishArticleAction(
         articleId,
         type: "PUBLISH",
         status: "PENDING",
-        payload: { articleId, connectionId },
+        payload: { articleId, connectionId, publishLive },
       },
       select: { id: true },
     })
 
     await publishQueue.add(
       "publish",
-      { articleId, connectionId },
+      { articleId, connectionId, publishLive },
       {
         jobId: job.id,
         attempts: 3,

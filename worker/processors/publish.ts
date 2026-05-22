@@ -9,6 +9,7 @@ import { transformBlocksToAstro } from "../../lib/adapters/astro-blog"
 interface PublishJobData {
   articleId: string
   connectionId: string
+  publishLive?: boolean
 }
 
 interface WordPressConfig {
@@ -162,7 +163,8 @@ async function publishToAstroBlog(
     featuredImage: string | null
     imageAlt: string | null
   },
-  cfg: CustomApiConfig
+  cfg: CustomApiConfig,
+  publishLive: boolean
 ): Promise<{ postUrl: string; externalId: string }> {
   const base = cfg.baseUrl.replace(/\/$/, "")
   const authHeaders: Record<string, string> =
@@ -187,13 +189,13 @@ async function publishToAstroBlog(
     excerpt: article.excerpt ?? "",
     tags: article.tags,
     category: cfg.category ?? "",
-    status: "draft",
+    status: publishLive ? "published" : "draft",
     ...(featuredImageUrl && { featuredImage: featuredImageUrl }),
+    ...(featuredImageUrl && article.imageAlt && { featuredImageAlt: article.imageAlt }),
     seo: {
       title: article.metaTitle ?? article.title ?? "",
       description: article.metaDescription ?? "",
       robots: "index,follow",
-      ...(article.imageAlt && { imageAlt: article.imageAlt }),
     },
     content: astroBlocks,
   }
@@ -295,7 +297,7 @@ async function publishToCustomApi(
 }
 
 export async function processPublishJob(job: Job<PublishJobData>): Promise<void> {
-  const { articleId, connectionId } = job.data
+  const { articleId, connectionId, publishLive = false } = job.data
 
   const genJob = await db.generationJob.findFirst({
     where: { articleId, status: "PENDING", type: "PUBLISH" },
@@ -349,7 +351,7 @@ export async function processPublishJob(job: Job<PublishJobData>): Promise<void>
     } else if (connection.type === "CUSTOM_API") {
       const cfg = connection.config as unknown as CustomApiConfig
       if (cfg.format === "astro-blog") {
-        const result = await publishToAstroBlog(article, cfg)
+        const result = await publishToAstroBlog(article, cfg, publishLive)
         postUrl = result.postUrl
         externalId = result.externalId
       } else {
