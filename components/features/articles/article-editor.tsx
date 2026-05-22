@@ -980,15 +980,14 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
                         : <RotateCcw className="w-3.5 h-3.5 mr-1.5" />}
                       Regenerate
                     </Button>
-                    <Button size="sm" variant="outline" asChild>
-                      <a
-                        href={`/api/articles/${initialArticle.id}/image?t=${imageCacheBust}`}
-                        download={`featured-image-${initialArticle.id}.webp`}
-                      >
-                        <Download className="w-3.5 h-3.5 mr-1.5" />
-                        Download
-                      </a>
-                    </Button>
+                    <a
+                      href={`/api/articles/${initialArticle.id}/image?t=${imageCacheBust}`}
+                      download={`featured-image-${initialArticle.id}.webp`}
+                      className="inline-flex items-center justify-center rounded-md border border-zinc-200 bg-white px-3 h-8 text-xs font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5 mr-1.5" />
+                      Download
+                    </a>
                   </div>
 
                   <div className="space-y-2 pt-2 border-t border-zinc-100">
