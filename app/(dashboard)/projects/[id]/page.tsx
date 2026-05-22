@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { getProjectById } from "@/server/actions/projects"
+import { getTemplates } from "@/server/actions/templates"
 import { StatusBadge } from "@/components/features/status-badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tags, FileText, Globe, ArrowLeft, ExternalLink } from "lucide-react"
 import { format } from "date-fns"
+import { ProjectTemplatesSection } from "@/components/features/projects/project-templates-section"
 
 interface ProjectDetailPageProps {
   params: Promise<{ id: string }>
@@ -12,7 +14,10 @@ interface ProjectDetailPageProps {
 
 export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const { id } = await params
-  const project = await getProjectById(id)
+  const [project, templates] = await Promise.all([
+    getProjectById(id),
+    getTemplates(id),
+  ])
   if (!project) notFound()
 
   const publishModeLabels: Record<string, string> = {
@@ -86,6 +91,12 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
           </div>
         </CardContent>
       </Card>
+
+      <ProjectTemplatesSection
+        projectId={project.id}
+        projectName={project.name}
+        initialTemplates={templates}
+      />
 
       <div className="flex gap-3">
         <Link href={`/keywords?projectId=${project.id}`}
