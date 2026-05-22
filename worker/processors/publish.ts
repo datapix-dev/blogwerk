@@ -1,4 +1,6 @@
 import type { Job } from "bullmq"
+import fs from "fs/promises"
+import path from "path"
 import { db } from "../../lib/db"
 import type { JobErrorType } from "@prisma/client"
 import type { ContentBlock } from "../../lib/ai/claude"
@@ -111,6 +113,41 @@ async function publishToWordPress(
   return { postUrl: data.link, wpPostId: data.id }
 }
 
+async function uploadAstroMedia(
+  filePath: string,
+  slug: string | null,
+  authHeaders: Record<string, string>,
+  base: string
+): Promise<string | null> {
+  try {
+    const fileBuffer = await fs.readFile(filePath)
+    const ext = path.extname(filePath) || ".webp"
+    const fileName = `${slug ?? "featured-image"}${ext}`
+
+    const form = new FormData()
+    form.append("file", new Blob([fileBuffer], { type: "image/webp" }), fileName)
+
+    const res = await fetch(`${base}/api/blog/admin/media`, {
+      method: "POST",
+      headers: authHeaders,
+      body: form,
+      signal: AbortSignal.timeout(60_000),
+    })
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "")
+      console.warn(`[publish] Media upload failed ${res.status}: ${text.slice(0, 200)}`)
+      return null
+    }
+
+    const data = (await res.json()) as { url?: string }
+    return data.url ?? null
+  } catch (err) {
+    console.warn(`[publish] Media upload error: ${err instanceof Error ? err.message : err}`)
+    return null
+  }
+}
+
 async function publishToAstroBlog(
   article: {
     id: string
@@ -122,18 +159,22 @@ async function publishToAstroBlog(
     tags: string[]
     blocks: unknown
     externalId: string | null
+    featuredImage: string | null
     imageAlt: string | null
   },
   cfg: CustomApiConfig
 ): Promise<{ postUrl: string; externalId: string }> {
   const base = cfg.baseUrl.replace(/\/$/, "")
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  }
-  if (cfg.authType === "bearer") {
-    headers["Authorization"] = `Bearer ${cfg.authValue}`
-  } else {
-    headers["X-Api-Key"] = cfg.authValue
+  const authHeaders: Record<string, string> =
+    cfg.authType === "bearer"
+      ? { Authorization: `Bearer ${cfg.authValue}` }
+      : { "X-Api-Key": cfg.authValue }
+
+  // Upload featured image if we have a local file
+  let featuredImageUrl: string | undefined
+  if (article.featuredImage) {
+    const uploaded = await uploadAstroMedia(article.featuredImage, article.slug, authHeaders, base)
+    if (uploaded) featuredImageUrl = uploaded
   }
 
   const astroBlocks = Array.isArray(article.blocks)
@@ -147,11 +188,12 @@ async function publishToAstroBlog(
     tags: article.tags,
     category: cfg.category ?? "",
     status: "draft",
+    ...(featuredImageUrl && { featuredImage: featuredImageUrl }),
     seo: {
       title: article.metaTitle ?? article.title ?? "",
       description: article.metaDescription ?? "",
       robots: "index,follow",
-      imageAlt: article.imageAlt ?? "",
+      ...(article.imageAlt && { imageAlt: article.imageAlt }),
     },
     content: astroBlocks,
   }
@@ -163,7 +205,7 @@ async function publishToAstroBlog(
 
   const res = await fetch(endpoint, {
     method: isUpdate ? "PUT" : "POST",
-    headers,
+    headers: { ...authHeaders, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(30_000),
   })
