@@ -11,6 +11,6 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
   },
-  "include": ["worker/**/*.ts", "lib/redis.ts"],
+  "include": ["worker/**/*.ts", "lib/redis.ts", "lib/ai/**/*.ts", "lib/adapters/**/*.ts"],
   "exclude": ["node_modules", ".next", "app", "components"]
 }

@@ -1,4 +1,4 @@
-import type { ContentBlock } from "@/lib/ai/claude"
+import type { ContentBlock, StatisticsBlock, StepsBlock } from "../ai/claude"
 
 type AstroBlock = Record<string, unknown>
 
@@ -20,7 +20,7 @@ export function transformBlocksToAstro(blocks: ContentBlock[]): AstroBlock[] {
       case "statistics":
         return [{
           type: "statistics",
-          items: block.items.map(item => ({
+          items: block.items.map((item: StatisticsBlock["items"][number]) => ({
             value: item.stat,
             label: item.stat,
             description: item.context,
@@ -84,8 +84,11 @@ export function transformBlocksToAstro(blocks: ContentBlock[]): AstroBlock[] {
       case "steps":
         return [{
           type: "how_to",
-          steps: block.items.map(s => ({ title: s.title, text: s.description })),
+          steps: block.items.map((s: StepsBlock["items"][number]) => ({ title: s.title, text: s.description })),
         }]
+
+      default:
+        return []
     }
   })
 }
