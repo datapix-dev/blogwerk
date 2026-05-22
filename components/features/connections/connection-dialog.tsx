@@ -77,6 +77,8 @@ export function ConnectionDialog({
   const [apiAuthValue, setApiAuthValue] = React.useState("")
   const [apiPostEndpoint, setApiPostEndpoint] = React.useState("")
   const [apiImageEndpoint, setApiImageEndpoint] = React.useState("")
+  const [apiFormat, setApiFormat] = React.useState<"" | "astro-blog">("")
+  const [apiCategory, setApiCategory] = React.useState("")
 
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState("")
@@ -130,6 +132,8 @@ export function ConnectionDialog({
         setApiAuthValue("")
         setApiPostEndpoint(getConfigString(cfg, "postEndpoint"))
         setApiImageEndpoint(getConfigString(cfg, "imageEndpoint"))
+        setApiFormat((getConfigString(cfg, "format") as "" | "astro-blog") || "")
+        setApiCategory(getConfigString(cfg, "category"))
       }
     } else {
       setStep("config")
@@ -144,6 +148,8 @@ export function ConnectionDialog({
       setApiAuthValue("")
       setApiPostEndpoint("")
       setApiImageEndpoint("")
+      setApiFormat("")
+      setApiCategory("")
       setTestStatus("idle")
       setTestMessage("")
       setSavedId(null)
@@ -208,6 +214,8 @@ export function ConnectionDialog({
           postEndpoint: apiPostEndpoint.trim(),
           fieldMapping: {},
           ...(apiImageEndpoint ? { imageEndpoint: apiImageEndpoint.trim() } : {}),
+          ...(apiFormat ? { format: apiFormat } : {}),
+          ...(apiCategory ? { category: apiCategory.trim() } : {}),
         }
       }
 
@@ -479,6 +487,38 @@ export function ConnectionDialog({
                     onChange={(e) => setApiImageEndpoint(e.target.value)}
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <Label>Format (optional)</Label>
+                  <Select
+                    value={apiFormat || "_generic"}
+                    onValueChange={(v) => setApiFormat(v === "_generic" ? "" : v as "astro-blog")}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_generic">Generic (field mapping)</SelectItem>
+                      <SelectItem value="astro-blog">Astro Blog</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-zinc-400">
+                    Select Astro Blog to send structured content blocks instead of HTML
+                  </p>
+                </div>
+                {apiFormat === "astro-blog" && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="api-category">Category ID (optional)</Label>
+                    <Input
+                      id="api-category"
+                      placeholder="e.g. cat-seo"
+                      value={apiCategory}
+                      onChange={(e) => setApiCategory(e.target.value)}
+                    />
+                    <p className="text-xs text-zinc-400">
+                      Default category ID to assign to published posts
+                    </p>
+                  </div>
+                )}
               </>
             )}
 

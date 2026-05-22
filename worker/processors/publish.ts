@@ -1,6 +1,8 @@
 import type { Job } from "bullmq"
 import { db } from "../../lib/db"
 import type { JobErrorType } from "@prisma/client"
+import type { ContentBlock } from "../../lib/ai/claude"
+import { transformBlocksToAstro } from "../../lib/adapters/astro-blog"
 
 interface PublishJobData {
   articleId: string
@@ -23,6 +25,8 @@ interface CustomApiConfig {
   postEndpoint: string
   imageEndpoint?: string
   fieldMapping: Record<string, string>
+  format?: "astro-blog"
+  category?: string
 }
 
 function classifyPublishError(err: unknown): JobErrorType {
@@ -105,6 +109,72 @@ async function publishToWordPress(
 
   const data = (await res.json()) as { id: number; link: string }
   return { postUrl: data.link, wpPostId: data.id }
+}
+
+async function publishToAstroBlog(
+  article: {
+    id: string
+    title: string | null
+    slug: string | null
+    metaTitle: string | null
+    metaDescription: string | null
+    excerpt: string | null
+    tags: string[]
+    blocks: unknown
+    externalId: string | null
+  },
+  cfg: CustomApiConfig
+): Promise<{ postUrl: string; externalId: string }> {
+  const base = cfg.baseUrl.replace(/\/$/, "")
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  }
+  if (cfg.authType === "bearer") {
+    headers["Authorization"] = `Bearer ${cfg.authValue}`
+  } else {
+    headers["X-Api-Key"] = cfg.authValue
+  }
+
+  const astroBlocks = Array.isArray(article.blocks)
+    ? transformBlocksToAstro(article.blocks as ContentBlock[])
+    : []
+
+  const payload: Record<string, unknown> = {
+    title: article.title ?? "",
+    slug: article.slug ?? undefined,
+    excerpt: article.excerpt ?? "",
+    tags: article.tags,
+    category: cfg.category ?? "",
+    status: "draft",
+    seo: {
+      title: article.metaTitle ?? article.title ?? "",
+      description: article.metaDescription ?? "",
+      robots: "index,follow",
+    },
+    content: astroBlocks,
+  }
+
+  const isUpdate = !!article.externalId
+  const endpoint = isUpdate
+    ? `${base}/api/blog/admin/posts/${article.externalId}`
+    : `${base}/api/blog/admin/posts`
+
+  const res = await fetch(endpoint, {
+    method: isUpdate ? "PUT" : "POST",
+    headers,
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(30_000),
+  })
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "")
+    throw new Error(`Astro Blog POST failed with HTTP ${res.status}: ${text.slice(0, 300)}`)
+  }
+
+  const data = (await res.json()) as { id?: string | number; url?: string; slug?: string }
+  const externalId = String(data.id ?? article.externalId ?? "")
+  const postUrl = data.url ?? `${base}/blog/${data.slug ?? article.slug ?? ""}`
+  return { postUrl, externalId }
 }
 
 async function publishToCustomApi(
@@ -210,6 +280,7 @@ export async function processPublishJob(job: Job<PublishJobData>): Promise<void>
         tags: true,
         featuredImage: true,
         externalId: true,
+        blocks: true,
       },
     }),
     db.apiConnection.findUnique({
@@ -232,9 +303,15 @@ export async function processPublishJob(job: Job<PublishJobData>): Promise<void>
       externalId = String(result.wpPostId)
     } else if (connection.type === "CUSTOM_API") {
       const cfg = connection.config as unknown as CustomApiConfig
-      const result = await publishToCustomApi(article, cfg)
-      postUrl = result.postUrl
-      externalId = result.externalId
+      if (cfg.format === "astro-blog") {
+        const result = await publishToAstroBlog(article, cfg)
+        postUrl = result.postUrl
+        externalId = result.externalId
+      } else {
+        const result = await publishToCustomApi(article, cfg)
+        postUrl = result.postUrl
+        externalId = result.externalId
+      }
     } else {
       throw new Error(`Unknown connection type: ${connection.type}`)
     }

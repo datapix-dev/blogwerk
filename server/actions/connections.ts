@@ -31,6 +31,8 @@ export type CustomApiConfig = {
   postEndpoint: string
   imageEndpoint?: string
   fieldMapping: Record<string, string>
+  format?: "astro-blog"
+  category?: string
 }
 
 export async function getConnections(): Promise<ConnectionWithProject[]> {
