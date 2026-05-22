@@ -22,7 +22,7 @@ export function transformBlocksToAstro(blocks: ContentBlock[]): AstroBlock[] {
           type: "statistics",
           items: block.items.map((item: StatisticsBlock["items"][number]) => ({
             value: item.stat,
-            label: item.stat,
+            label: "",
             description: item.context,
           })),
         }]
@@ -78,7 +78,10 @@ export function transformBlocksToAstro(blocks: ContentBlock[]): AstroBlock[] {
         return [{
           type: "citation",
           title: "Quellen",
-          items: block.items,
+          items: block.items.map((item) => ({
+            title: item.title,
+            url: item.url ?? "",
+          })),
         }]
 
       case "steps":
