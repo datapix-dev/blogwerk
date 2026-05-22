@@ -111,34 +111,30 @@ export function KeywordImportDialog({ open, onOpenChange, projects, defaultProje
     })
   }
 
-  function applyParsedData(rows: Record<string, unknown>[], hdrs: string[], fileName: string) {
-    // If detected headers don't match any known field, try using first data row as headers
-    if (!looksLikeHeaders(hdrs) && rows.length > 0) {
-      const firstRowValues = Object.values(rows[0]).map((v) => String(v ?? ""))
-      if (looksLikeHeaders(firstRowValues)) {
-        const newHdrs = firstRowValues
-        const newRows = rows.slice(1).map((row) => {
-          const vals = Object.values(row)
-          return Object.fromEntries(newHdrs.map((h, i) => [h, vals[i] ?? ""]))
-        })
-        setRawRows(newRows); setHeaders(newHdrs); setMapping(autoDetectMapping(newHdrs))
-        setFileName(fileName); setStep("mapping")
-        return
-      }
+  function buildFromArrayRows(allRows: string[][], fileName: string) {
+    if (!allRows.length) { setUploadError("No rows found."); return }
+    // Find the header row — skip leading title/empty rows
+    let headerIdx = 0
+    for (let i = 0; i < Math.min(allRows.length, 5); i++) {
+      if (looksLikeHeaders(allRows[i])) { headerIdx = i; break }
     }
-    setRawRows(rows); setHeaders(hdrs); setMapping(autoDetectMapping(hdrs))
+    const hdrs = allRows[headerIdx].map((h) => h.trim()).filter(Boolean)
+    const dataRows = allRows.slice(headerIdx + 1)
+      .filter((r) => r.some((v) => v.trim() !== ""))
+      .map((r) => Object.fromEntries(hdrs.map((h, i) => [h, r[i] ?? ""])))
+    if (!dataRows.length) { setUploadError("No data rows found after header."); return }
+    setRawRows(dataRows); setHeaders(hdrs); setMapping(autoDetectMapping(hdrs))
     setFileName(fileName); setStep("mapping")
   }
 
   function processFile(file: File) {
     setUploadError("")
     if (file.name.endsWith(".csv")) {
+      // Parse as raw arrays so we handle title rows + any delimiter correctly
       Papa.parse(file, {
-        header: true, skipEmptyLines: true,
+        header: false, skipEmptyLines: true,
         complete: (results) => {
-          const rows = results.data as Record<string, unknown>[]
-          const hdrs = results.meta.fields ?? []
-          applyParsedData(rows, hdrs, file.name)
+          buildFromArrayRows(results.data as string[][], file.name)
         },
         error: (err) => setUploadError(`CSV parse error: ${err.message}`),
       })
@@ -150,10 +146,8 @@ export function KeywordImportDialog({ open, onOpenChange, projects, defaultProje
           if (!data) throw new Error("Empty file")
           const workbook = XLSX.read(data as ArrayBuffer, { type: "array" })
           const sheet = workbook.Sheets[workbook.SheetNames[0]]
-          const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null })
-          if (!rows.length) throw new Error("No rows found.")
-          const hdrs = Object.keys(rows[0])
-          applyParsedData(rows, hdrs, file.name)
+          const allRows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, defval: "" }) as string[][]
+          buildFromArrayRows(allRows, file.name)
         } catch (err) {
           setUploadError(`XLSX error: ${err instanceof Error ? err.message : String(err)}`)
         }
