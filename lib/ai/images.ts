@@ -35,17 +35,17 @@ async function generateWithOpenAI(prompt: string, apiKey?: string): Promise<Buff
   const key = apiKey ?? process.env.OPENAI_API_KEY
   if (!key) throw new Error("OPENAI_API_KEY not configured")
 
+  // gpt-image-1 (2025+): no response_format, returns b64_json by default
   const res = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "dall-e-3",
+      model: "gpt-image-1",
       prompt,
       n: 1,
-      size: "1792x1024",
-      response_format: "b64_json",
+      size: "1536x1024",
     }),
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(90_000),
   })
 
   if (!res.ok) {
