@@ -1,11 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Eye, EyeOff, Save, X, KeyRound, CheckCircle2 } from "lucide-react"
+import { Eye, EyeOff, Save, X, KeyRound, CheckCircle2, Zap, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { saveApiKeyVault, type VaultData, type VaultKeyInfo, type KeyUpdates } from "@/server/actions/api-keys"
+import { saveApiKeyVault, testApiKey, type VaultData, type VaultKeyInfo, type KeyUpdates } from "@/server/actions/api-keys"
 
 type VaultField = "anthropicKey" | "openaiKey" | "googleAiKey" | "nanoBananaKey"
 import { toast } from "sonner"
@@ -16,6 +16,8 @@ const KEY_META: { field: VaultField; label: string; hint: string }[] = [
   { field: "googleAiKey",   label: "Google AI API Key",   hint: "Used for Imagen image generation fallback" },
   { field: "nanoBananaKey", label: "Nano Banana API Key", hint: "Used for Nano Banana image provider" },
 ]
+
+type TestStatus = "idle" | "testing" | "ok" | "error"
 
 interface KeyRowProps {
   field: VaultField
@@ -32,16 +34,29 @@ interface KeyRowProps {
 
 function KeyRow({ field, label, hint, isSet, preview, value, cleared, onChange, onClear, onRestore }: KeyRowProps) {
   const [visible, setVisible] = useState(false)
+  const [testStatus, setTestStatus] = useState<TestStatus>("idle")
+  const [testMessage, setTestMessage] = useState("")
 
   const effectivelySet = isSet && !cleared
   const hasNewValue = value.length > 0
 
+  async function handleTest() {
+    setTestStatus("testing")
+    setTestMessage("")
+    try {
+      const res = await testApiKey(field)
+      setTestStatus(res.success ? "ok" : "error")
+      setTestMessage(res.message)
+    } catch {
+      setTestStatus("error")
+      setTestMessage("Test failed unexpectedly.")
+    }
+  }
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label htmlFor={field} className="text-sm font-medium text-zinc-800">
-          {label}
-        </Label>
+        <Label htmlFor={field} className="text-sm font-medium text-zinc-800">{label}</Label>
         {effectivelySet && !hasNewValue && (
           <span className="flex items-center gap-1 text-xs text-emerald-600">
             <CheckCircle2 className="w-3 h-3" />
@@ -61,33 +76,39 @@ function KeyRow({ field, label, hint, isSet, preview, value, cleared, onChange, 
             autoComplete="off"
           />
           {(value.length > 0 || (effectivelySet && !hasNewValue)) && (
-            <button
-              type="button"
-              onClick={() => setVisible(!visible)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
-              tabIndex={-1}
-            >
+            <button type="button" onClick={() => setVisible(!visible)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600" tabIndex={-1}>
               {visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           )}
         </div>
         {effectivelySet && !hasNewValue && (
-          <Button
-            variant="ghost"
-            size="sm"
-            type="button"
-            onClick={onClear}
-            className="shrink-0 text-zinc-400 hover:text-red-600"
-          >
-            <X className="w-4 h-4" />
-          </Button>
+          <>
+            <Button variant="outline" size="sm" type="button" onClick={handleTest}
+              disabled={testStatus === "testing"} className="shrink-0 h-9 text-xs">
+              {testStatus === "testing"
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Zap className="w-3.5 h-3.5" />}
+            </Button>
+            <Button variant="ghost" size="sm" type="button" onClick={onClear}
+              className="shrink-0 text-zinc-400 hover:text-red-600">
+              <X className="w-4 h-4" />
+            </Button>
+          </>
         )}
         {cleared && (
-          <Button variant="ghost" size="sm" type="button" onClick={onRestore} className="shrink-0 text-zinc-400 hover:text-zinc-700 text-xs">
-            Undo
-          </Button>
+          <Button variant="ghost" size="sm" type="button" onClick={onRestore}
+            className="shrink-0 text-zinc-400 hover:text-zinc-700 text-xs">Undo</Button>
         )}
       </div>
+      {testStatus !== "idle" && testMessage && (
+        <p className={`text-xs flex items-center gap-1 ${testStatus === "ok" ? "text-emerald-600" : "text-red-600"}`}>
+          {testStatus === "ok"
+            ? <CheckCircle2 className="w-3 h-3 shrink-0" />
+            : <X className="w-3 h-3 shrink-0" />}
+          {testMessage}
+        </p>
+      )}
       <p className="text-xs text-zinc-400">{hint}</p>
     </div>
   )
