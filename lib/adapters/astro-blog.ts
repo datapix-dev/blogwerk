@@ -76,10 +76,11 @@ export function transformBlocksToAstro(blocks: ContentBlock[]): AstroBlock[] {
 
       case "sources":
         return [{
-          type: "citation",
+          type: "sources",
           title: "Quellen",
           items: block.items.map((item) => ({
             title: item.title,
+            text: item.title,
             url: item.url ?? "",
           })),
         }]
