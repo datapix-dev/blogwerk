@@ -2,13 +2,15 @@
 
 import * as React from "react"
 import { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Plus, Upload, X, ChevronDown } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Plus, Upload, X, ChevronDown, Download } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
 import { DataTable } from "../data-table"
 import { StatusBadge } from "../status-badge"
 import { KeywordDialog } from "./keyword-dialog"
@@ -44,7 +46,28 @@ export function KeywordsTable({ initialData, projects, defaultProjectId }: Keywo
   const [selectedRows, setSelectedRows] = React.useState<KeywordWithProject[]>([])
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [importOpen, setImportOpen] = React.useState(false)
+  const [templateOpen, setTemplateOpen] = React.useState(false)
+  const [templateProjectId, setTemplateProjectId] = React.useState(defaultProjectId ?? "")
   const [editingKeyword, setEditingKeyword] = React.useState<KeywordWithProject | null>(null)
+
+  function handleDownloadTemplate() {
+    const project = projects.find((p) => p.id === templateProjectId)
+    const projectName = project?.name ?? "project"
+    const rows = [
+      ["keyword", "search_volume", "difficulty", "intent", "priority", "cluster", "target_url"],
+      ["beispiel keyword", "1000", "45", "INFORMATIONAL", "HIGH", "SEO Basics", "https://example.com/seite"],
+      ["weiteres keyword", "500", "30", "COMMERCIAL", "MEDIUM", "", ""],
+    ]
+    const csv = rows.map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `keywords-template-${projectName.toLowerCase().replace(/\s+/g, "-")}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    setTemplateOpen(false)
+  }
 
   const filteredData = React.useMemo(() => data.filter((kw) => {
     if (search && !kw.keyword.toLowerCase().includes(search.toLowerCase())) return false
@@ -238,6 +261,7 @@ export function KeywordsTable({ initialData, projects, defaultProjectId }: Keywo
               </SelectContent>
             </Select>
             <div className="ml-auto flex gap-2">
+              <Button size="sm" variant="outline" className="h-8" onClick={() => { setTemplateProjectId(defaultProjectId ?? projects[0]?.id ?? ""); setTemplateOpen(true) }}><Download className="w-3.5 h-3.5 mr-1.5" />Template</Button>
               <Button size="sm" variant="outline" className="h-8" onClick={() => setImportOpen(true)}><Upload className="w-3.5 h-3.5 mr-1.5" />Import</Button>
               <Button size="sm" className="h-8" onClick={() => { setEditingKeyword(null); setDialogOpen(true) }}><Plus className="w-3.5 h-3.5 mr-1.5" />Add Keyword</Button>
             </div>
@@ -250,6 +274,42 @@ export function KeywordsTable({ initialData, projects, defaultProjectId }: Keywo
         keyword={editingKeyword} projects={projects} defaultProjectId={defaultProjectId} onSuccess={handleSuccess}
       />
       <KeywordImportDialog open={importOpen} onOpenChange={setImportOpen} projects={projects} defaultProjectId={defaultProjectId} onSuccess={handleSuccess} />
+
+      <Dialog open={templateOpen} onOpenChange={setTemplateOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Download CSV Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-zinc-500">
+              Download a CSV template with the correct column structure for keyword imports.
+            </p>
+            <div className="space-y-1.5">
+              <Label>Project</Label>
+              <Select value={templateProjectId} onValueChange={(v) => { if (v) setTemplateProjectId(v) }}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Select project..." /></SelectTrigger>
+                <SelectContent>
+                  {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="rounded-lg bg-zinc-50 border border-zinc-200 px-3 py-2.5 text-xs text-zinc-500 font-mono leading-relaxed">
+              keyword, search_volume, difficulty,<br />
+              intent, priority, cluster, target_url
+            </div>
+            <p className="text-xs text-zinc-400">
+              Intent: INFORMATIONAL · COMMERCIAL · TRANSACTIONAL · NAVIGATIONAL<br />
+              Priority: LOW · MEDIUM · HIGH
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTemplateOpen(false)}>Cancel</Button>
+            <Button onClick={handleDownloadTemplate} disabled={!templateProjectId}>
+              <Download className="w-3.5 h-3.5 mr-1.5" />Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
