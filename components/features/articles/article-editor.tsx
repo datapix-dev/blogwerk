@@ -30,7 +30,7 @@ import type { ConnectionWithProject } from "@/server/actions/connections"
 import type { ArticleWithRelations } from "@/server/actions/articles"
 import type { ArticleStatus } from "@prisma/client"
 import useSWR from "swr"
-import { generateImageAction } from "@/server/actions/image"
+import { generateImageAction, generateImageAltAction, saveImageAltAction } from "@/server/actions/image"
 import {
   CheckCheck,
   Eye,
@@ -50,6 +50,7 @@ import {
   Link2,
   Megaphone,
   Sparkles,
+  Download,
 } from "lucide-react"
 
 type FaqItem = { question: string; answer: string }
@@ -186,6 +187,9 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
   const [imageJobPending, setImageJobPending] = React.useState(false)
   const [imageCacheBust, setImageCacheBust] = React.useState(0)
   React.useEffect(() => { setImageCacheBust(Date.now()) }, [])
+  const [imageAlt, setImageAlt] = React.useState(initialArticle.imageAlt ?? "")
+  const [generatingAlt, setGeneratingAlt] = React.useState(false)
+  const [savingAlt, setSavingAlt] = React.useState(false)
   const [adapting, setAdapting] = React.useState(false)
   const [adaptationPending, setAdaptationPending] = React.useState(false)
   const [enhancing, setEnhancing] = React.useState(false)
@@ -469,6 +473,35 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
       toast.error("Failed to start image generation.")
     } finally {
       setGeneratingImage(false)
+    }
+  }
+
+  async function handleGenerateAlt() {
+    setGeneratingAlt(true)
+    try {
+      const result = await generateImageAltAction(initialArticle.id)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      setImageAlt(result.alt)
+      toast.success("Alt text generated.")
+    } catch {
+      toast.error("Failed to generate alt text.")
+    } finally {
+      setGeneratingAlt(false)
+    }
+  }
+
+  async function handleSaveAlt() {
+    setSavingAlt(true)
+    try {
+      await saveImageAltAction(initialArticle.id, imageAlt)
+      toast.success("Alt text saved.")
+    } catch {
+      toast.error("Failed to save alt text.")
+    } finally {
+      setSavingAlt(false)
     }
   }
 
@@ -922,7 +955,7 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
                   <Loader2 className="w-5 h-5 animate-spin text-zinc-400 flex-shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-zinc-700">Generating image…</p>
-                    <p className="text-xs text-zinc-400 mt-0.5">This may take up to 30 seconds.</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">This may take up to 3 minutes.</p>
                   </div>
                 </div>
               ) : hasImage ? (
@@ -931,21 +964,65 @@ export function ArticleEditor({ article: initialArticle, hasAdaptationTemplate =
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={`/api/articles/${initialArticle.id}/image?t=${imageCacheBust}`}
-                      alt="Featured image"
+                      alt={imageAlt || "Featured image"}
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleGenerateImage}
-                    disabled={generatingImage}
-                  >
-                    {generatingImage
-                      ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                      : <RotateCcw className="w-3.5 h-3.5 mr-1.5" />}
-                    Regenerate Image
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleGenerateImage}
+                      disabled={generatingImage}
+                    >
+                      {generatingImage
+                        ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        : <RotateCcw className="w-3.5 h-3.5 mr-1.5" />}
+                      Regenerate
+                    </Button>
+                    <Button size="sm" variant="outline" asChild>
+                      <a
+                        href={`/api/articles/${initialArticle.id}/image?t=${imageCacheBust}`}
+                        download={`featured-image-${initialArticle.id}.webp`}
+                      >
+                        <Download className="w-3.5 h-3.5 mr-1.5" />
+                        Download
+                      </a>
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-zinc-100">
+                    <Label className="text-xs font-medium text-zinc-700">Alt Text (SEO)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={imageAlt}
+                        onChange={(e) => setImageAlt(e.target.value)}
+                        placeholder="Describe the image for SEO…"
+                        className="text-sm flex-1"
+                        maxLength={125}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleGenerateAlt}
+                        disabled={generatingAlt}
+                        title="Generate SEO alt text with AI"
+                      >
+                        {generatingAlt
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <Sparkles className="w-3.5 h-3.5" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleSaveAlt}
+                        disabled={savingAlt}
+                      >
+                        {savingAlt ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save"}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-zinc-400">{imageAlt.length}/125 characters</p>
+                  </div>
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-zinc-200 p-8 text-center space-y-3">

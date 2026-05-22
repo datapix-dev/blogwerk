@@ -122,6 +122,7 @@ async function publishToAstroBlog(
     tags: string[]
     blocks: unknown
     externalId: string | null
+    imageAlt: string | null
   },
   cfg: CustomApiConfig
 ): Promise<{ postUrl: string; externalId: string }> {
@@ -150,6 +151,7 @@ async function publishToAstroBlog(
       title: article.metaTitle ?? article.title ?? "",
       description: article.metaDescription ?? "",
       robots: "index,follow",
+      imageAlt: article.imageAlt ?? "",
     },
     content: astroBlocks,
   }
@@ -279,6 +281,7 @@ export async function processPublishJob(job: Job<PublishJobData>): Promise<void>
         excerpt: true,
         tags: true,
         featuredImage: true,
+        imageAlt: true,
         externalId: true,
         blocks: true,
       },

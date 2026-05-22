@@ -164,6 +164,7 @@ model Article {
   category        String?
   tags            String[]
   featuredImage   String?
+  imageAlt        String?
   status          ArticleStatus @default(DRAFT)
   publishMode     PublishMode   @default(DRAFT)
   publishAt       DateTime?

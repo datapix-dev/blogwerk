@@ -27,6 +27,7 @@ export type ArticleWithRelations = {
   category: string | null
   tags: string[]
   featuredImage: string | null
+  imageAlt: string | null
   status: ArticleStatus
   publishMode: string
   publishAt: Date | null
@@ -67,6 +68,7 @@ const articleSelect = {
   category: true,
   tags: true,
   featuredImage: true,
+  imageAlt: true,
   status: true,
   publishMode: true,
   publishAt: true,
