@@ -40,7 +40,7 @@ async function generateWithOpenAI(prompt: string, apiKey?: string): Promise<Buff
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-image-1",
+      model: "gpt-image-2",
       prompt,
       n: 1,
       size: "1536x1024",
