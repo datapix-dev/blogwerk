@@ -1,6 +1,7 @@
 import type { Job } from "bullmq"
 import { db } from "../../lib/db"
 import { enhanceArticle, type ContentBlock, blocksToMarkdown, blocksToHtml } from "../../lib/ai/claude"
+import { DEFAULT_EDITORIAL_BRAIN } from "../../lib/ai/prompts"
 import { resolveWorkspaceApiKey } from "../../lib/api-vault"
 import type { Prisma } from "@prisma/client"
 
@@ -43,13 +44,23 @@ export async function processEditorialJob(job: Job<EditorialJobData>): Promise<v
     }),
     db.promptTemplate.findFirst({
       where: { projectId, type: "EDITORIAL", isActive: true },
+      // Without an explicit order, two active versions make the winner depend
+      // on whatever Postgres returns first. ARTICLE already ordered by version;
+      // the other types did not.
+      orderBy: { version: "desc" },
       select: { content: true },
     }),
   ])
 
   if (!article) throw new Error(`Article not found: ${articleId}`)
   if (!article.blocks) throw new Error(`Article ${articleId} has no blocks for editorial enhancement`)
-  if (!editorialTemplate) throw new Error(`No active EDITORIAL template for project ${projectId}`)
+
+  // The de-slop pass runs for every article now. A project template refines
+  // this stage; its absence no longer skips it.
+  const editorialBrain = editorialTemplate?.content ?? DEFAULT_EDITORIAL_BRAIN
+  if (!editorialTemplate) {
+    console.log(`[editorial-processor] No EDITORIAL template for project ${projectId} — using default brain`)
+  }
 
   const anthropicKey = await resolveWorkspaceApiKey(
     article.project.workspaceId,
@@ -66,7 +77,7 @@ export async function processEditorialJob(job: Job<EditorialJobData>): Promise<v
       intent: article.keyword?.intent ?? null,
       targetAudience: article.project.targetAudience ?? null,
       toneOfVoice: article.project.toneOfVoice ?? null,
-      editorialBrain: editorialTemplate.content,
+      editorialBrain,
       apiKey: anthropicKey,
     })
   } catch (err) {
@@ -85,8 +96,8 @@ export async function processEditorialJob(job: Job<EditorialJobData>): Promise<v
       where: { id: articleId },
       data: {
         blocks: enhancedBlocks,
-        contentMarkdown: blocksToMarkdown(enhanced.blocks),
-        contentHtml: blocksToHtml(enhanced.blocks),
+        contentMarkdown: blocksToMarkdown(enhanced.blocks, article.project.language),
+        contentHtml: blocksToHtml(enhanced.blocks, article.project.language),
         status: "AI_ENHANCED",
       },
     }),

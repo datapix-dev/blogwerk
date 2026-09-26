@@ -42,6 +42,7 @@ export async function processAdaptationJob(job: Job<AdaptationJobData>): Promise
     }),
     db.promptTemplate.findFirst({
       where: { projectId, type: "FORMATTING", isActive: true },
+      orderBy: { version: "desc" },
       select: { content: true },
     }),
   ])

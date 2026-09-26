@@ -1,6 +1,31 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { jsonrepair } from "jsonrepair"
 import { buildSystemPrompt, buildUserPrompt, buildAdaptationSystemPrompt, buildAdaptationUserPrompt, buildEditorialSystemPrompt, buildEditorialUserPrompt } from "./prompts"
+import { labelsFor } from "./i18n"
+import { ARTICLE_FORMAT, ADAPTATION_FORMAT, EDITORIAL_FORMAT } from "./schemas"
+
+// ─── Model & request defaults ─────────────────────────────────────────────────
+
+/**
+ * Override per deployment via ANTHROPIC_MODEL. Defaults to the current
+ * top-tier model; `claude-sonnet-5` is the cheaper option and is still both
+ * newer and less expensive than the previously used `claude-sonnet-4-6`.
+ */
+const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-opus-5"
+
+/**
+ * Thinking, search results and the full JSON article all count against this.
+ * 16k was tight enough that a long article could be cut off mid-JSON — and
+ * jsonrepair would then "fix" it into a silently truncated article. Requests
+ * stream, so a large ceiling carries no timeout risk.
+ */
+const MAX_TOKENS = 64000
+
+/** Resume limit for server-side tool loops that stop with `pause_turn`. */
+const MAX_CONTINUATIONS = 3
+
+/** Two-letter region hint for web search; shapes which sources surface. */
+const SEARCH_COUNTRY = process.env.SEARCH_COUNTRY ?? "DE"
 
 // ─── Content Block Types ──────────────────────────────────────────────────────
 
@@ -8,8 +33,8 @@ export interface ParagraphBlock       { type: "paragraph";        content: strin
 export interface HeadingBlock         { type: "heading";          level: 2 | 3; content: string }
 export interface TldrBlock            { type: "tldr";             content: string }
 export interface KeyTakeawaysBlock    { type: "key_takeaways";    items: string[] }
-export interface StatisticsBlock      { type: "statistics";       items: { stat: string; context: string }[] }
-export interface QuoteBlock           { type: "quote";            content: string; attribution?: string }
+export interface StatisticsBlock      { type: "statistics";       items: { stat: string; context: string; sourceTitle?: string; sourceUrl?: string }[] }
+export interface QuoteBlock           { type: "quote";            content: string; attribution?: string; sourceUrl?: string }
 export interface ComparisonTableBlock { type: "comparison_table"; headers: string[]; rows: string[][] }
 export interface ProsConsBlock        { type: "pros_cons";        pros: string[]; cons: string[] }
 export interface ChecklistBlock       { type: "checklist";        title?: string; items: string[] }
@@ -28,7 +53,8 @@ export type ContentBlock =
 
 // ─── Block → Markdown ─────────────────────────────────────────────────────────
 
-export function blocksToMarkdown(blocks: ContentBlock[]): string {
+export function blocksToMarkdown(blocks: ContentBlock[], language?: string | null): string {
+  const L = labelsFor(language)
   return blocks.map(block => {
     switch (block.type) {
       case "paragraph":
@@ -36,11 +62,14 @@ export function blocksToMarkdown(blocks: ContentBlock[]): string {
       case "heading":
         return `${"#".repeat(block.level)} ${block.content}`
       case "tldr":
-        return `> **TL;DR:** ${block.content}`
+        return `> **${L.tldr}:** ${block.content}`
       case "key_takeaways":
-        return `**Key Takeaways:**\n${block.items.map(i => `- ${i}`).join("\n")}`
+        return `**${L.keyTakeaways}:**\n${block.items.map(i => `- ${i}`).join("\n")}`
       case "statistics":
-        return block.items.map(s => `**${s.stat}** — ${s.context}`).join("\n\n")
+        return block.items.map(s => {
+          const source = s.sourceUrl && s.sourceTitle ? ` ([${s.sourceTitle}](${s.sourceUrl}))` : ""
+          return `**${s.stat}** — ${s.context}${source}`
+        }).join("\n\n")
       case "quote":
         return `> ${block.content}${block.attribution ? `\n> — *${block.attribution}*` : ""}`
       case "comparison_table": {
@@ -50,7 +79,7 @@ export function blocksToMarkdown(blocks: ContentBlock[]): string {
         return `${head}\n${sep}\n${rows}`
       }
       case "pros_cons":
-        return `**Pros:**\n${block.pros.map(p => `- ${p}`).join("\n")}\n\n**Cons:**\n${block.cons.map(c => `- ${c}`).join("\n")}`
+        return `**${L.pros}:**\n${block.pros.map(p => `- ${p}`).join("\n")}\n\n**${L.cons}:**\n${block.cons.map(c => `- ${c}`).join("\n")}`
       case "checklist": {
         const title = block.title ? `**${block.title}**\n\n` : ""
         return `${title}${block.items.map(i => `- [ ] ${i}`).join("\n")}`
@@ -58,13 +87,13 @@ export function blocksToMarkdown(blocks: ContentBlock[]): string {
       case "faq":
         return block.items.map(f => `**${f.question}**\n\n${f.answer}`).join("\n\n")
       case "warning":
-        return `> ⚠️ **Warning:** ${block.content}`
+        return `> ⚠️ **${L.warning}:** ${block.content}`
       case "best_practices":
-        return `**Best Practices:**\n${block.items.map(i => `- ${i}`).join("\n")}`
+        return `**${L.bestPractices}:**\n${block.items.map(i => `- ${i}`).join("\n")}`
       case "cta":
         return `**${block.text}**${block.subtext ? `\n\n${block.subtext}` : ""}`
       case "sources":
-        return `**Sources:**\n${block.items.map(s => s.url ? `- [${s.title}](${s.url})` : `- ${s.title}`).join("\n")}`
+        return `**${L.sources}:**\n${block.items.map(s => s.url ? `- [${s.title}](${s.url})` : `- ${s.title}`).join("\n")}`
       case "steps":
         return block.items.map((s, i) => `**${i + 1}. ${s.title}**\n\n${s.description}`).join("\n\n")
     }
@@ -73,7 +102,8 @@ export function blocksToMarkdown(blocks: ContentBlock[]): string {
 
 // ─── Block → HTML ─────────────────────────────────────────────────────────────
 
-export function blocksToHtml(blocks: ContentBlock[]): string {
+export function blocksToHtml(blocks: ContentBlock[], language?: string | null): string {
+  const L = labelsFor(language)
   return blocks.map(block => {
     switch (block.type) {
       case "paragraph":
@@ -81,11 +111,16 @@ export function blocksToHtml(blocks: ContentBlock[]): string {
       case "heading":
         return `<h${block.level}>${block.content}</h${block.level}>`
       case "tldr":
-        return `<blockquote><strong>TL;DR:</strong> ${block.content}</blockquote>`
+        return `<blockquote><strong>${L.tldr}:</strong> ${block.content}</blockquote>`
       case "key_takeaways":
         return `<ul>${block.items.map(i => `<li>${i}</li>`).join("")}</ul>`
       case "statistics":
-        return `<ul>${block.items.map(s => `<li><strong>${s.stat}</strong> — ${s.context}</li>`).join("")}</ul>`
+        return `<ul>${block.items.map(s => {
+          const source = s.sourceUrl && s.sourceTitle
+            ? ` <cite><a href="${s.sourceUrl}" rel="nofollow noopener" target="_blank">${s.sourceTitle}</a></cite>`
+            : ""
+          return `<li><strong>${s.stat}</strong> — ${s.context}${source}</li>`
+        }).join("")}</ul>`
       case "quote":
         return `<blockquote><p>${block.content}</p>${block.attribution ? `<cite>— ${block.attribution}</cite>` : ""}</blockquote>`
       case "comparison_table": {
@@ -103,13 +138,15 @@ export function blocksToHtml(blocks: ContentBlock[]): string {
       case "faq":
         return block.items.map(f => `<h3>${f.question}</h3><p>${f.answer}</p>`).join("\n")
       case "warning":
-        return `<blockquote><strong>⚠️ Warning:</strong> ${block.content}</blockquote>`
+        return `<blockquote><strong>⚠️ ${L.warning}:</strong> ${block.content}</blockquote>`
       case "best_practices":
-        return `<ul>${block.items.map(i => `<li>${i}</li>`).join("")}</ul>`
+        return `<h3>${L.bestPractices}</h3><ul>${block.items.map(i => `<li>${i}</li>`).join("")}</ul>`
       case "cta":
         return `<p><strong>${block.text}</strong>${block.subtext ? `<br>${block.subtext}` : ""}</p>`
       case "sources":
-        return `<ul>${block.items.map(s => s.url ? `<li><a href="${s.url}">${s.title}</a></li>` : `<li>${s.title}</li>`).join("")}</ul>`
+        return `<h3>${L.sources}</h3><ul>${block.items.map(s => s.url
+          ? `<li><a href="${s.url}" rel="nofollow noopener" target="_blank">${s.title}</a></li>`
+          : `<li>${s.title}</li>`).join("")}</ul>`
       case "steps":
         return `<ol>${block.items.map(s => `<li><strong>${s.title}</strong><p>${s.description}</p></li>`).join("")}</ol>`
     }
@@ -208,6 +245,76 @@ function parseArray<T>(val: unknown): T[] {
   return Array.isArray(val) ? (val as T[]) : []
 }
 
+/**
+ * Pull the JSON payload out of a response.
+ *
+ * With server tools enabled the response is no longer "one text block": it
+ * interleaves `server_tool_use` and `web_search_tool_result` blocks, and the
+ * answer is the LAST text block. Indexing content[0] silently breaks the moment
+ * web search is on, so never reach for it directly.
+ */
+function extractPayloadText(content: Anthropic.ContentBlock[], phase: string): string {
+  const texts = content.filter((b): b is Anthropic.TextBlock => b.type === "text")
+  const last = texts[texts.length - 1]
+  if (!last) throw new Error(`No text block in Claude ${phase} response`)
+  return stripJsonFences(last.text)
+}
+
+function parseJsonPayload(raw: string, phase: string): Record<string, unknown> {
+  try {
+    return JSON.parse(raw) as Record<string, unknown>
+  } catch {
+    // Structured outputs should make this unreachable; jsonrepair stays as a
+    // net for older models and for deployments that pin ANTHROPIC_MODEL back.
+    try {
+      return JSON.parse(jsonrepair(raw)) as Record<string, unknown>
+    } catch {
+      throw new Error(`Failed to parse Claude ${phase} response as JSON: ${raw.slice(0, 200)}`)
+    }
+  }
+}
+
+/**
+ * Stream a request to completion and refuse to hand back anything partial.
+ *
+ * - `pause_turn`: the server-side web search loop hit its iteration cap. The
+ *   turn is resumed by re-sending it with the paused assistant content; the
+ *   API picks up at the trailing server_tool_use block on its own.
+ * - `max_tokens` / `refusal`: the JSON is incomplete or absent. Throwing here
+ *   lets BullMQ retry, instead of jsonrepair closing the brackets on half an
+ *   article and the pipeline publishing it.
+ */
+async function runMessage(
+  client: Anthropic,
+  params: Anthropic.MessageStreamParams,
+  phase: string
+): Promise<Anthropic.Message> {
+  let messages = params.messages
+  for (let attempt = 0; ; attempt++) {
+    const message = await client.messages.stream({ ...params, messages }).finalMessage()
+
+    if (message.stop_reason === "pause_turn" && attempt < MAX_CONTINUATIONS) {
+      messages = [...messages, { role: "assistant", content: message.content }]
+      continue
+    }
+    if (message.stop_reason === "max_tokens") {
+      throw new Error(`Claude ${phase} response hit max_tokens (${params.max_tokens}) — output truncated`)
+    }
+    if (message.stop_reason === "refusal") {
+      throw new Error(`Claude declined the ${phase} request (${message.stop_details?.category ?? "no category"})`)
+    }
+    if (message.stop_reason === "pause_turn") {
+      throw new Error(`Claude ${phase} response still paused after ${MAX_CONTINUATIONS} continuations`)
+    }
+    return message
+  }
+}
+
+/** Cacheable system prompt block — the system prompt is identical per intent. */
+function cachedSystem(text: string): Anthropic.TextBlockParam[] {
+  return [{ type: "text", text, cache_control: { type: "ephemeral" } }]
+}
+
 // ─── generateArticle ─────────────────────────────────────────────────────────
 
 export async function generateArticle(
@@ -215,23 +322,27 @@ export async function generateArticle(
 ): Promise<GeneratedArticle> {
   const client = new Anthropic({ apiKey: params.apiKey ?? process.env.ANTHROPIC_API_KEY })
 
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 8192,
-    system: buildSystemPrompt(params.intent),
+  // Web search is what makes the grounding rules in the system prompt
+  // enforceable: without it the model can only invent statistics, which is the
+  // single biggest source of both hallucinated facts and generic-sounding copy.
+  const message = await runMessage(client, {
+    model: MODEL,
+    max_tokens: MAX_TOKENS,
+    thinking: { type: "adaptive" },
+    output_config: { effort: "high", format: ARTICLE_FORMAT },
+    system: cachedSystem(buildSystemPrompt(params.intent)),
+    tools: [
+      {
+        type: "web_search_20260209",
+        name: "web_search",
+        max_uses: 6,
+        user_location: { type: "approximate", country: SEARCH_COUNTRY },
+      },
+    ],
     messages: [{ role: "user", content: buildUserPrompt(params) }],
-  })
+  }, "article")
 
-  const rawContent = message.content[0]
-  if (rawContent.type !== "text") throw new Error("Unexpected response type from Claude API")
-
-  const cleaned = stripJsonFences(rawContent.text)
-  let parsed: Record<string, unknown>
-  try {
-    parsed = JSON.parse(jsonrepair(cleaned))
-  } catch {
-    throw new Error(`Failed to parse Claude response as JSON: ${cleaned.slice(0, 200)}`)
-  }
+  const parsed = parseJsonPayload(extractPayloadText(message.content, "article"), "article")
 
   for (const field of ["title", "slug", "metaTitle", "metaDescription", "excerpt"]) {
     if (!parsed[field] || typeof parsed[field] !== "string") {
@@ -248,8 +359,8 @@ export async function generateArticle(
     title: parsed.title as string,
     slug: parsed.slug as string,
     blocks,
-    contentMarkdown: blocksToMarkdown(blocks),
-    contentHtml: blocksToHtml(blocks),
+    contentMarkdown: blocksToMarkdown(blocks, params.language),
+    contentHtml: blocksToHtml(blocks, params.language),
     metaTitle: parsed.metaTitle as string,
     metaDescription: parsed.metaDescription as string,
     excerpt: parsed.excerpt as string,
@@ -263,23 +374,16 @@ export async function generateArticle(
 export async function adaptArticle(params: AdaptArticleParams): Promise<AdaptedArticle> {
   const client = new Anthropic({ apiKey: params.apiKey ?? process.env.ANTHROPIC_API_KEY })
 
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 8192,
-    system: buildAdaptationSystemPrompt(),
+  // Pure rendering — no search, no thinking budget needed.
+  const message = await runMessage(client, {
+    model: MODEL,
+    max_tokens: MAX_TOKENS,
+    output_config: { effort: "medium", format: ADAPTATION_FORMAT },
+    system: cachedSystem(buildAdaptationSystemPrompt()),
     messages: [{ role: "user", content: buildAdaptationUserPrompt(params) }],
-  })
+  }, "adaptation")
 
-  const rawContent = message.content[0]
-  if (rawContent.type !== "text") throw new Error("Unexpected response type from Claude API")
-
-  const cleaned = stripJsonFences(rawContent.text)
-  let parsed: Record<string, unknown>
-  try {
-    parsed = JSON.parse(jsonrepair(cleaned))
-  } catch {
-    throw new Error(`Failed to parse Claude adaptation response: ${cleaned.slice(0, 200)}`)
-  }
+  const parsed = parseJsonPayload(extractPayloadText(message.content, "adaptation"), "adaptation")
 
   if (!parsed.contentHtml || typeof parsed.contentHtml !== "string") {
     throw new Error("Missing contentHtml in Claude adaptation response")
@@ -299,23 +403,26 @@ export async function adaptArticle(params: AdaptArticleParams): Promise<AdaptedA
 export async function enhanceArticle(params: EnhanceArticleParams): Promise<EnhancedArticle> {
   const client = new Anthropic({ apiKey: params.apiKey ?? process.env.ANTHROPIC_API_KEY })
 
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 8192,
-    system: buildEditorialSystemPrompt(params.editorialBrain),
+  // The editorial pass may verify or add a fact, so it gets search too — but
+  // fewer uses: its job is sharpening, not research.
+  const message = await runMessage(client, {
+    model: MODEL,
+    max_tokens: MAX_TOKENS,
+    thinking: { type: "adaptive" },
+    output_config: { effort: "high", format: EDITORIAL_FORMAT },
+    system: cachedSystem(buildEditorialSystemPrompt(params.editorialBrain)),
+    tools: [
+      {
+        type: "web_search_20260209",
+        name: "web_search",
+        max_uses: 3,
+        user_location: { type: "approximate", country: SEARCH_COUNTRY },
+      },
+    ],
     messages: [{ role: "user", content: buildEditorialUserPrompt(params) }],
-  })
+  }, "editorial")
 
-  const rawContent = message.content[0]
-  if (rawContent.type !== "text") throw new Error("Unexpected response type from Claude API")
-
-  const cleaned = stripJsonFences(rawContent.text)
-  let parsed: Record<string, unknown>
-  try {
-    parsed = JSON.parse(jsonrepair(cleaned))
-  } catch {
-    throw new Error(`Failed to parse Claude editorial response: ${cleaned.slice(0, 200)}`)
-  }
+  const parsed = parseJsonPayload(extractPayloadText(message.content, "editorial"), "editorial")
 
   const blocks = parseArray<ContentBlock>(parsed.blocks)
   if (!blocks.length) {

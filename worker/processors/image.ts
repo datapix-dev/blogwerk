@@ -69,6 +69,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
           workspaceId: true,
           promptTemplates: {
             where: { type: "IMAGE", isActive: true },
+            orderBy: { version: "desc" },
             select: { content: true },
             take: 1,
           },

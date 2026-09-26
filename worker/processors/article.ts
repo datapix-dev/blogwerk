@@ -143,27 +143,22 @@ export async function processArticleJob(job: Job<ArticleJobData>): Promise<void>
 
   console.log(`[article-processor] Article ${articleId} generated: "${generated.title}"`)
 
-  // Auto-queue Phase 1.5 if an EDITORIAL template exists for this project
-  const editorialTemplate = await db.promptTemplate.findFirst({
-    where: { projectId, type: "EDITORIAL", isActive: true },
+  // Phase 1.5 always runs. It used to be queued only when the project had an
+  // EDITORIAL template, which meant the default path published un-reviewed
+  // Phase-1 output; the processor falls back to a default editorial brain.
+  const editorialJob = await db.generationJob.create({
+    data: {
+      articleId,
+      type: "EDITORIAL_ENHANCEMENT",
+      status: "PENDING",
+      payload: { projectId },
+    },
     select: { id: true },
   })
-
-  if (editorialTemplate) {
-    const editorialJob = await db.generationJob.create({
-      data: {
-        articleId,
-        type: "EDITORIAL_ENHANCEMENT",
-        status: "PENDING",
-        payload: { projectId },
-      },
-      select: { id: true },
-    })
-    await editorialQueue.add(
-      "enhance",
-      { articleId, projectId },
-      { jobId: editorialJob.id, attempts: 2, backoff: { type: "exponential", delay: 5000 } }
-    )
-    console.log(`[article-processor] Queued editorial enhancement for article ${articleId}`)
-  }
+  await editorialQueue.add(
+    "enhance",
+    { articleId, projectId },
+    { jobId: editorialJob.id, attempts: 2, backoff: { type: "exponential", delay: 5000 } }
+  )
+  console.log(`[article-processor] Queued editorial enhancement for article ${articleId}`)
 }

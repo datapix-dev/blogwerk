@@ -1,8 +1,10 @@
 import type { ContentBlock, StatisticsBlock, StepsBlock } from "../ai/claude"
+import { labelsFor } from "../ai/i18n"
 
 type AstroBlock = Record<string, unknown>
 
-export function transformBlocksToAstro(blocks: ContentBlock[]): AstroBlock[] {
+export function transformBlocksToAstro(blocks: ContentBlock[], language?: string | null): AstroBlock[] {
+  const L = labelsFor(language)
   return blocks.flatMap((block): AstroBlock[] => {
     switch (block.type) {
       case "paragraph":
@@ -23,7 +25,11 @@ export function transformBlocksToAstro(blocks: ContentBlock[]): AstroBlock[] {
           items: block.items.map((item: StatisticsBlock["items"][number]) => ({
             value: item.stat,
             label: "",
-            description: item.context,
+            // The Astro block schema has no source field, so the attribution
+            // rides along in the description rather than being dropped.
+            description: item.sourceTitle
+              ? `${item.context} (${item.sourceTitle})`
+              : item.context,
           })),
         }]
 
@@ -61,7 +67,7 @@ export function transformBlocksToAstro(blocks: ContentBlock[]): AstroBlock[] {
       case "best_practices":
         return [{
           type: "best_practices",
-          title: "Best Practices",
+          title: L.bestPractices,
           items: block.items,
         }]
 
@@ -77,7 +83,7 @@ export function transformBlocksToAstro(blocks: ContentBlock[]): AstroBlock[] {
       case "sources":
         return [{
           type: "citation",
-          title: "Quellen",
+          title: L.sources,
           items: block.items.map((item) => ({
             text: item.title,
             url: item.url ?? undefined,
