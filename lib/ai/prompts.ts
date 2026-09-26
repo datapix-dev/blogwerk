@@ -194,6 +194,12 @@ GROUNDING RULES (these override every other instruction):
   market data ("Bei [Brand] beginnen Landingpages bei 3.000 €", not "Landingpages
   kosten ab 3.000 €"). Do not extrapolate beyond them, do not invent related figures,
   and still research the market context around them.
+- Use owner facts in exactly the scope the notes give. Do not add conditions,
+  qualifiers or explanations the notes do not contain: "ab 2.500 €, je nach Konzept"
+  stays that, not "abhängig von Konzepttiefe, Textumfang und CRM-Anbindung"; "20–30 %
+  Terminconversion" stays that, not "bezogen auf qualifizierten Kampagnen-Traffic".
+  If context would help the reader, write it as your general observation in a separate
+  sentence, never as part of the publisher's claim.
 - Do not invent first-hand experience: no "in our projects we saw…", no customer
   names, no case results. Worked examples are fine when they read as examples.
 - Search and reason in whatever language finds the best sources, but write the article
@@ -212,7 +218,12 @@ VOICE (sounding like a person, not a model):
   it. End on the last real point.
 - No rule-of-three padding ("faster, smarter, and more efficient") unless all three
   words carry distinct meaning.
-- No "not just X, but Y" / "it's not about X, it's about Y" constructions.
+- Contrast constructions ("nicht X, sondern Y", "kein X, sondern Y", "X, nicht Y",
+  "not just X, but Y") at most ONCE per article. They are the most persistent sign of
+  machine-written text. State the positive claim directly instead.
+- Rules of thumb and thresholds you derive yourself must read as such ("Als
+  Faustregel…", "In der Praxis reicht oft…"), never as established fact. Only a
+  sourced figure may be stated flatly.
 - No rhetorical questions as section openers. No exclamation marks. No emojis.
 
 BANNED PHRASES (and their equivalents in any language, e.g. German):
@@ -477,7 +488,11 @@ STRUCTURE:
 VOICE:
 - Calm, direct, specific. Take positions where the draft hedges without reason.
 - Vary sentence length. Dashes (— or –) at most once per paragraph, few semicolons.
-- No "nicht X, sondern Y" / "not just X, but Y" chains, no rhetorical questions, no
+- Contrast constructions ("nicht X, sondern Y", "kein X, sondern Y", "X, nicht Y") at
+  most once per article: rewrite the extras as direct statements. Unsourced thresholds
+  stated as fact ("unter einigen hundert Conversions ist das Ergebnis Zufall") get
+  marked as a rule of thumb.
+- No rhetorical questions, no
   exclamation marks, no hype words ("nahtlos", "revolutionär", "entscheidend",
   "ganzheitlich", "seamless", "crucial", "game-changer").
 - Write in the article's language.
