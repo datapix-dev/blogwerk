@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import { jsonrepair } from "jsonrepair"
 import { buildSystemPrompt, buildUserPrompt, buildAdaptationSystemPrompt, buildAdaptationUserPrompt, buildEditorialSystemPrompt, buildEditorialUserPrompt } from "./prompts"
 import { labelsFor } from "./i18n"
-import { ARTICLE_FORMAT, ADAPTATION_FORMAT, EDITORIAL_FORMAT } from "./schemas"
+import { ADAPTATION_FORMAT } from "./schemas"
 
 // ─── Model & request defaults ─────────────────────────────────────────────────
 
@@ -248,24 +248,31 @@ function parseArray<T>(val: unknown): T[] {
 /**
  * Pull the JSON payload out of a response.
  *
- * With server tools enabled the response is no longer "one text block": it
- * interleaves `server_tool_use` and `web_search_tool_result` blocks, and the
- * answer is the LAST text block. Indexing content[0] silently breaks the moment
- * web search is on, so never reach for it directly.
+ * With server tools enabled the response interleaves `server_tool_use` and
+ * `web_search_tool_result` blocks with text, and text that cites a search
+ * result is split into several text blocks. The answer is therefore every
+ * text block after the last tool block, joined — never content[0], and not
+ * just the last text block.
  */
 function extractPayloadText(content: Anthropic.ContentBlock[], phase: string): string {
-  const texts = content.filter((b): b is Anthropic.TextBlock => b.type === "text")
-  const last = texts[texts.length - 1]
-  if (!last) throw new Error(`No text block in Claude ${phase} response`)
-  return stripJsonFences(last.text)
+  let lastTool = -1
+  content.forEach((b, i) => { if (b.type !== "text" && b.type !== "thinking" && b.type !== "redacted_thinking") lastTool = i })
+  const text = content
+    .slice(lastTool + 1)
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+  if (!text.trim()) throw new Error(`No text block in Claude ${phase} response`)
+  return stripJsonFences(text)
 }
 
 function parseJsonPayload(raw: string, phase: string): Record<string, unknown> {
   try {
     return JSON.parse(raw) as Record<string, unknown>
   } catch {
-    // Structured outputs should make this unreachable; jsonrepair stays as a
-    // net for older models and for deployments that pin ANTHROPIC_MODEL back.
+    // Article and editorial run without structured outputs (grammar limit),
+    // so this is the normal net for stray prose or a missing bracket.
+    // Truncation never reaches here: runMessage throws on max_tokens.
     try {
       return JSON.parse(jsonrepair(raw)) as Record<string, unknown>
     } catch {
@@ -329,7 +336,11 @@ export async function generateArticle(
     model: MODEL,
     max_tokens: MAX_TOKENS,
     thinking: { type: "adaptive" },
-    output_config: { effort: "high", format: ARTICLE_FORMAT },
+    // No output_config.format here: the 15-variant block union exceeds the
+    // structured-output grammar limit (400 "compiled grammar is too large", and
+    // a flattened block is rejected as "too complex"). The JSON contract lives
+    // in the system prompt; runMessage + parseJsonPayload guard the result.
+    output_config: { effort: "high" },
     system: cachedSystem(buildSystemPrompt(params.intent)),
     tools: [
       {
@@ -409,7 +420,7 @@ export async function enhanceArticle(params: EnhanceArticleParams): Promise<Enha
     model: MODEL,
     max_tokens: MAX_TOKENS,
     thinking: { type: "adaptive" },
-    output_config: { effort: "high", format: EDITORIAL_FORMAT },
+    output_config: { effort: "high" }, // same grammar limit as generateArticle
     system: cachedSystem(buildEditorialSystemPrompt(params.editorialBrain)),
     tools: [
       {
