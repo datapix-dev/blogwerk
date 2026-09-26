@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createKeyword, updateKeyword } from "@/server/actions/keywords"
 import type { KeywordWithProject } from "@/server/actions/keywords"
@@ -54,6 +55,7 @@ export function KeywordDialog({ open, onOpenChange, keyword, projects, defaultPr
   const [priority, setPriority] = React.useState<Priority>("MEDIUM")
   const [cluster, setCluster] = React.useState("")
   const [targetUrl, setTargetUrl] = React.useState("")
+  const [notes, setNotes] = React.useState("")
   const [status, setStatus] = React.useState<KeywordStatus>("OPEN")
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState("")
@@ -68,6 +70,7 @@ export function KeywordDialog({ open, onOpenChange, keyword, projects, defaultPr
       setPriority(keyword?.priority ?? "MEDIUM")
       setCluster(keyword?.cluster ?? "")
       setTargetUrl(keyword?.targetUrl ?? "")
+      setNotes(keyword?.notes ?? "")
       setStatus(keyword?.status ?? "OPEN")
       setError("")
     }
@@ -83,7 +86,7 @@ export function KeywordDialog({ open, onOpenChange, keyword, projects, defaultPr
         searchVolume: searchVolume ? parseInt(searchVolume, 10) : undefined,
         difficulty: difficulty ? parseInt(difficulty, 10) : undefined,
         intent: (intent || undefined) as SearchIntent | undefined,
-        priority, cluster: cluster || undefined, targetUrl: targetUrl || undefined, status,
+        priority, cluster: cluster || undefined, targetUrl: targetUrl || undefined, notes, status,
       }
       const result = isEditing
         ? await updateKeyword(keyword!.id, payload)
@@ -154,6 +157,17 @@ export function KeywordDialog({ open, onOpenChange, keyword, projects, defaultPr
               <Label htmlFor="kw-url">Target URL</Label>
               <Input id="kw-url" type="url" placeholder="https://..." value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)} />
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="kw-notes">Notes for the AI</Label>
+            <Textarea
+              id="kw-notes"
+              rows={3}
+              placeholder="Facts from your side, e.g. Our landing pages start at 3,000 €, delivery in 2–3 weeks."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">Used as verified facts in the article. Only enter what is true.</p>
           </div>
           <div className="space-y-1.5">
             <Label>Status</Label>

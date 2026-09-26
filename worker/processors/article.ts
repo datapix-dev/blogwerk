@@ -77,6 +77,7 @@ export async function processArticleJob(job: Job<ArticleJobData>): Promise<void>
       intent: keyword.intent,
       cluster: keyword.cluster,
       customPromptTemplate: customTemplate,
+      keywordNotes: keyword.notes,
       apiKey: anthropicKey,
     })
   } catch (err) {

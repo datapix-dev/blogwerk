@@ -171,6 +171,7 @@ export interface EnhanceArticleParams {
   targetAudience?: string | null
   toneOfVoice?: string | null
   editorialBrain: string
+  keywordNotes?: string | null
   apiKey?: string
 }
 
@@ -198,6 +199,7 @@ export interface GenerateArticleParams {
   intent?: string | null
   cluster?: string | null
   customPromptTemplate?: string | null
+  keywordNotes?: string | null
   apiKey?: string
 }
 

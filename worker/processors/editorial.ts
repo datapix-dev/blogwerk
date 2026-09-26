@@ -39,7 +39,7 @@ export async function processEditorialJob(job: Job<EditorialJobData>): Promise<v
             toneOfVoice: true,
           },
         },
-        keyword: { select: { keyword: true, intent: true } },
+        keyword: { select: { keyword: true, intent: true, notes: true } },
       },
     }),
     db.promptTemplate.findFirst({
@@ -78,6 +78,7 @@ export async function processEditorialJob(job: Job<EditorialJobData>): Promise<v
       targetAudience: article.project.targetAudience ?? null,
       toneOfVoice: article.project.toneOfVoice ?? null,
       editorialBrain,
+      keywordNotes: article.keyword?.notes ?? null,
       apiKey: anthropicKey,
     })
   } catch (err) {

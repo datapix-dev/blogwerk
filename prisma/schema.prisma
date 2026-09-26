@@ -121,6 +121,8 @@ model Keyword {
   priority     Priority      @default(MEDIUM)
   cluster      String?
   targetUrl    String?
+  /// Owner-supplied facts for the AI (own prices, offers, angle), used in generation.
+  notes        String?
   status       KeywordStatus @default(OPEN)
   createdAt    DateTime      @default(now())
 

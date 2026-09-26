@@ -15,6 +15,7 @@ export type KeywordWithProject = {
   priority: Priority
   cluster: string | null
   targetUrl: string | null
+  notes: string | null
   status: KeywordStatus
   createdAt: Date
   project: { id: string; name: string }
@@ -59,6 +60,7 @@ export type CreateKeywordInput = {
   priority?: Priority
   cluster?: string
   targetUrl?: string
+  notes?: string
   status?: KeywordStatus
 }
 
@@ -83,6 +85,7 @@ export async function createKeyword(
         priority: data.priority ?? "MEDIUM",
         cluster: data.cluster?.trim() || null,
         targetUrl: data.targetUrl?.trim() || null,
+        notes: data.notes?.trim() || null,
         status: data.status ?? "OPEN",
       },
     })
@@ -118,6 +121,7 @@ export async function updateKeyword(
         ...(data.priority !== undefined && { priority: data.priority }),
         ...(data.cluster !== undefined && { cluster: data.cluster?.trim() || null }),
         ...(data.targetUrl !== undefined && { targetUrl: data.targetUrl?.trim() || null }),
+        ...(data.notes !== undefined && { notes: data.notes?.trim() || null }),
         ...(data.status !== undefined && { status: data.status }),
       },
     })
