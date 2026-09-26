@@ -348,7 +348,7 @@ export async function generateArticle(
       {
         type: "web_search_20260209",
         name: "web_search",
-        max_uses: 6,
+        max_uses: 10,
         user_location: { type: "approximate", country: SEARCH_COUNTRY },
       },
     ],
